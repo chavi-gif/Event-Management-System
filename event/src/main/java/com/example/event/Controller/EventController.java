@@ -1,0 +1,4 @@
+package com.example.event.Controller;
+
+public class EventController {
+}
