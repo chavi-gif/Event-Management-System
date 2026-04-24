@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:fragment="navbar-head">
+    <link rel="stylesheet" href="/css/style.css"/>
+</head>
+<div th:fragment="navbar">
+    <nav class="navbar">
+        <a href="/" class="nav-brand">
+            <img src="/images/logo2.png" alt="Logo" onerror="this.style.display='none'"/>
+            <div class="nav-brand-text">
+                <div class="title">University of Ruhuna</div>
+                <div class="sub">Faculty of Technology</div>
+            </div>
+        </a>
+        <ul class="nav-links">
+            <li><a href="/">Home</a></li>
+            <li><a href="/events">Events</a></li>
+            <li><a href="/booking">Book Event</a></li>
+            <li><a href="/resources">Resources</a></li>
+            <li id="navAuthItem">
+                <a href="/login" class="btn-nav-login">Login</a>
+            </li>
+        </ul>
+    </nav>
+</div>
+
+<script th:fragment="navbar-script">
+    let currentUser = null;
+
+    function loadCurrentUser() {
+        fetch('/api/current-user')
+            .then(response => response.ok ? response.json() : null)
+            .then(user => {
+                currentUser = user;
+                updateNavbar();
+            })
+            .catch(() => updateNavbar());
+    }
+
+    function updateNavbar() {
+        const authItem = document.getElementById('navAuthItem');
+        if (!authItem) return;
+
+        if (currentUser) {
+            const firstName = currentUser.firstName || currentUser.email.split('@')[0];
+            const initial = firstName.charAt(0).toUpperCase();
+            authItem.innerHTML = `
+                <div style="display:flex;align-items:center;gap:10px;">
+                    <div style="width:34px;height:34px;border-radius:50%;background:var(--gold);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;">${initial}</div>
+                    <span style="color:#fff;">Hi, ${firstName}</span>
+                    <button onclick="window.location.href='/logout'" style="background:#c9922a;border:1px solid #c9922a;color:#fff;padding:5px 12px;border-radius:6px;cursor:pointer;">Logout</button>
+                </div>
+            `;
+        } else {
+            authItem.innerHTML = `<a href="/login" class="btn-nav-login">Login</a>`;
+        }
+    }
+
+    loadCurrentUser();
+</script>
+</html>
