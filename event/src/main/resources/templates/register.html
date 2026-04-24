@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Register — Event Management System</title>
+    <link rel="stylesheet" href="/css/style.css"/>
+</head>
+<body>
+
+<!-- ========== NAVBAR ========== -->
+<nav class="navbar">
+    <a href="/" class="nav-brand">
+        <img src="/images/logo2.png" alt="Logo" onerror="this.style.display='none'"/>
+        <div class="nav-brand-text">
+            <div class="title">University of Ruhuna</div>
+            <div class="sub">Faculty of Technology</div>
+        </div>
+    </a>
+    <ul class="nav-links">
+        <li><a href="/">Home</a></li>
+    </ul>
+</nav>
+
+<!-- ========== REGISTER SECTION ========== -->
+<section class="section">
+    <div class="container" style="max-width:500px;">
+        <h2 class="section-title">Create Account</h2>
+        <div class="divider"></div>
+        <p class="section-subtitle">Join us to manage your events and bookings</p>
+
+        <!-- Success/Error Messages -->
+        <div class="alert alert-success" id="successMessage" style="display:none; background:#d4edda; color:#155724; padding:10px; border-radius:5px; margin-bottom:15px;">
+            <span>Registration successful! Redirecting to login...</span>
+        </div>
+        <div class="alert alert-danger" id="errorMessage" style="display:none; background:#f8d7da; color:#721c24; padding:10px; border-radius:5px; margin-bottom:15px;">
+            <span id="errorText"></span>
+        </div>
+
+        <!-- FORM -->
+        <form id="registerForm" class="form-card">
+            <div class="form-row" style="display:flex; gap:15px;">
+                <div class="form-group" style="flex:1;">
+                    <label class="form-label">First Name <span class="required">*</span></label>
+                    <input type="text" id="firstName" name="firstName" class="form-control" placeholder="Enter first name" required>
+                </div>
+
+                <div class="form-group" style="flex:1;">
+                    <label class="form-label">Last Name <span class="required">*</span></label>
+                    <input type="text" id="lastName" name="lastName" class="form-control" placeholder="Enter last name" required>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Email <span class="required">*</span></label>
+                <input type="email" id="email" name="email" class="form-control" placeholder="Enter your email" required>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Password <span class="required">*</span></label>
+                <input type="password" id="password" name="password" class="form-control" placeholder="Create a password" required>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Confirm Password <span class="required">*</span></label>
+                <input type="password" id="confirmPassword" name="confirmPassword" class="form-control" placeholder="Confirm your password" required>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Student ID</label>
+                <input type="text" id="studentId" name="studentId" class="form-control" placeholder="Example: TG/2024/1234" onblur="checkStudentId()">
+                <small style="color: #666; font-size: 12px;">Format: TG/YYYY/XXX (e.g., TG/2024/1234)</small>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Level/Year</label>
+                <input type="text" id="level" name="level" class="form-control" readonly style="background-color: #f5f5f5;" >
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Phone Number</label>
+                <input type="tel" id="phoneNumber" name="phoneNumber" class="form-control" placeholder="Enter phone number (optional)">
+            </div>
+
+            <div style="margin-top:1.5rem;">
+                <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center;">
+                    Register
+                </button>
+            </div>
+
+            <div style="margin-top:1rem; text-align:center;">
+                <p>Already have an account? <a href="/login" style="color:#4a6f8f;">Login here</a></p>
+            </div>
+        </form>
+    </div>
+</section>
+
+<!-- ========== FOOTER ========== -->
+<footer>
+    <p>© 2026 <strong>University of Ruhuna</strong> | Faculty of Technology — Event Management System</p>
+</footer>
+
+<script>
+    const registerForm = document.getElementById('registerForm');
+    const successMessage = document.getElementById('successMessage');
+    const errorMessage = document.getElementById('errorMessage');
+    const errorText = document.getElementById('errorText');
+
+    // Auto-detect level from Student ID using database
+    async function checkStudentId() {
+        const studentIdInput = document.getElementById('studentId');
+        const studentId = studentIdInput.value;
+        const levelField = document.getElementById('level');
+
+        // Remove existing message div if any
+        const existingMsg = document.getElementById('studentIdMessage');
+        if (existingMsg) existingMsg.remove();
+
+        if (studentId.length === 0) {
+            studentIdInput.style.borderColor = '';
+            levelField.value = '';
+            return;
+        }
+
+        // Create message div
+        const msgDiv = document.createElement('div');
+        msgDiv.id = 'studentIdMessage';
+        msgDiv.style.fontSize = '12px';
+        msgDiv.style.marginTop = '5px';
+        studentIdInput.parentNode.appendChild(msgDiv);
+
+        try {
+            const response = await fetch(`/api/detect-level?studentId=${encodeURIComponent(studentId)}`);
+            const data = await response.json();
+
+            if (data.valid) {
+                // Valid Student ID
+                studentIdInput.style.borderColor = '#2e7d4f';
+                msgDiv.style.color = '#2e7d4f';
+                msgDiv.innerHTML = `✓ ${data.message}`;
+
+                // Auto-fill level in read-only field
+                if (data.level) {
+                    levelField.value = `Level ${data.level}`;
+                }
+            } else {
+                // Invalid Student ID - Shows RED error message while typing
+                studentIdInput.style.borderColor = '#c0392b';
+                msgDiv.style.color = '#c0392b';
+                msgDiv.innerHTML = `✗ ${data.message}`;
+                levelField.value = '';
+            }
+        } catch (error) {
+            studentIdInput.style.borderColor = '#c0392b';
+            msgDiv.style.color = '#c0392b';
+            msgDiv.innerHTML = '✗ Error validating Student ID';
+            levelField.value = '';
+        }
+    }
+
+    registerForm.addEventListener('submit', function(event) {
+        event.preventDefault();
+
+        // Clear previous messages
+        successMessage.style.display = 'none';
+        errorMessage.style.display = 'none';
+
+        // Get form values
+        const firstName = document.getElementById('firstName').value;
+        const lastName = document.getElementById('lastName').value;
+        const email = document.getElementById('email').value;
+        const password = document.getElementById('password').value;
+        const confirmPassword = document.getElementById('confirmPassword').value;
+        const studentId = document.getElementById('studentId').value;
+        let level = document.getElementById('level').value;
+        const phoneNumber = document.getElementById('phoneNumber').value;
+
+        // Extract level number from "Level X" format
+        if (level.startsWith('Level ')) {
+            level = level.replace('Level ', '');
+        }
+
+        // Validation
+        if (password !== confirmPassword) {
+            showError("Passwords do not match!");
+            return;
+        }
+
+        if (password.length < 4) {
+            showError("Password must be at least 4 characters long!");
+            return;
+        }
+
+        // Prepare data
+        const userData = {
+            firstName: firstName,
+            lastName: lastName,
+            email: email,
+            password: password,
+            studentId: studentId,
+            level: level,
+            phoneNumber: phoneNumber
+        };
+
+        // Send registration request
+        fetch('/api/register', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(userData)
+        })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    successMessage.style.display = 'block';
+                    setTimeout(() => {
+                        window.location.href = '/login';
+                    }, 2000);
+                } else {
+                    showError(data.message || "Registration failed. Please try again.");
+                }
+            })
+            .catch(error => {
+                showError("An error occurred. Please try again.");
+            });
+    });
+
+    function showError(message) {
+        errorText.innerText = message;
+        errorMessage.style.display = 'block';
+
+        // Clear Student ID validation styling when error occurs
+        const studentIdInput = document.getElementById('studentId');
+        if (studentIdInput) {
+            studentIdInput.style.borderColor = '';
+        }
+        const msgDiv = document.getElementById('studentIdMessage');
+        if (msgDiv) msgDiv.remove();
+
+        // Scroll to top
+        window.scrollTo({
+            top: 0,
+            behavior: 'smooth'
+        });
+    }
+</script>
+
+</body>
+</html>
