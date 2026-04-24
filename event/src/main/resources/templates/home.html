@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Home — Event Management System</title>
+    <link rel="stylesheet" href="/css/style.css"/>
+    <div th:replace="navbar :: navbar-head"></div>
+    <style>
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(13,43,78,0.55);
+            z-index: 2000;
+            align-items: center;
+            justify-content: center;
+            padding: 1rem;
+        }
+        .modal-overlay.open { display: flex; }
+        .modal {
+            background: #ffffff;
+            border-radius: 14px;
+            max-width: 420px;
+            width: 100%;
+            box-shadow: 0 8px 32px rgba(13,43,78,0.18);
+            overflow: hidden;
+        }
+        .modal-header {
+            background: #0d2b4e;
+            padding: 1.2rem 1.6rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .modal-header h3 {
+            color: #ffffff;
+            font-family: 'Merriweather', serif;
+            font-size: 1rem;
+            margin: 0;
+        }
+        .modal-close {
+            background: none;
+            border: none;
+            cursor: pointer;
+            color: rgba(255,255,255,0.6);
+            font-size: 1.4rem;
+        }
+        .modal-body {
+            padding: 1.8rem 1.6rem;
+            text-align: center;
+        }
+        .modal-footer {
+            padding: 1rem 1.6rem;
+            border-top: 1px solid #eef1f5;
+            display: flex;
+            justify-content: center;
+            gap: 0.8rem;
+        }
+    </style>
+</head>
+<body>
+
+<!-- Import Navbar -->
+<div th:replace="navbar :: navbar"></div>
+
+<!-- Auth Modal -->
+<div class="modal-overlay" id="authModal">
+    <div class="modal">
+        <div class="modal-header">
+            <h3>🔒 Login Required</h3>
+            <button class="modal-close" onclick="closeAuthModal()">✕</button>
+        </div>
+        <div class="modal-body">
+            <div class="lock-icon">🔐</div>
+            <h4>You need to login first!</h4>
+            <p>Please login to access this feature.</p>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-outline" onclick="closeAuthModal()">Cancel</button>
+            <a href="#" id="modalLoginBtn" class="btn btn-gold">Login Now →</a>
+        </div>
+    </div>
+</div>
+
+<section class="hero">
+    <div class="hero-bg"></div>
+    <div class="hero-content">
+        <div class="hero-badge">Faculty of Technology</div>
+        <h1>Event Management System</h1>
+        <p>Organize and participate in university events</p>
+        &nbsp;
+
+    </div>
+</section>
+
+<section class="section" style="padding-bottom:0;">
+    <div class="container">
+        <div class="stats-grid" id="statsGrid">
+            <div class="stat-card"><div class="stat-num" id="statTotal">—</div><div class="stat-label">Total Bookings</div></div>
+            <div class="stat-card gold"><div class="stat-num" id="statUpcoming">—</div><div class="stat-label">Upcoming Events</div></div>
+            <div class="stat-card green"><div class="stat-num" id="statVenues">—</div><div class="stat-label">Available Venues</div></div>
+            <div class="stat-card"><div class="stat-num" id="statEquipment">—</div><div class="stat-label">Equipment Types</div></div>
+        </div>
+    </div>
+</section>
+
+<section class="section">
+    <div class="container">
+        <h2 class="section-title">Upcoming University Events</h2>
+        <div class="divider"></div>
+        <div class="grid-3" id="eventsGrid">
+            <p style="color:var(--gray-500)">Loading events...</p>
+        </div>
+        <div style="text-align:center;margin-top:2rem;">
+            <a href="/events" class="btn btn-outline">View All Events →</a>
+        </div>
+    </div>
+</section>
+
+<section class="notices-section">
+    <div class="container">
+        <h2>📢 Notices</h2>
+        <ul class="notice-list">
+            <li>All event bookings must be made at least 3 days in advance.</li>
+            <li>All students must carry their university ID when attending events.</li>
+            <li>Resource availability is subject to approval by the Faculty administration.</li>
+            <li>Double booking of the same venue on the same date is not permitted.</li>
+            <li>New events are updated weekly on this portal.</li>
+        </ul>
+    </div>
+</section>
+
+<footer>
+    <p>© 2026 <strong>University of Ruhuna</strong> | Faculty of Technology — Event Management System</p>
+</footer>
+
+<div id="toast"></div>
+<script src="/js/api.js"></script>
+<script>
+    function openAuthModal(intendedHref) {
+        document.getElementById('modalLoginBtn').href = `/login?redirect=${encodeURIComponent(intendedHref)}`;
+        document.getElementById('authModal').classList.add('open');
+    }
+
+    function closeAuthModal() {
+        document.getElementById('authModal').classList.remove('open');
+    }
+
+    document.getElementById('authModal').addEventListener('click', function(e) {
+        if (e.target === this) closeAuthModal();
+    });
+
+    document.querySelectorAll('.protected-link').forEach(link => {
+        link.addEventListener('click', function(e) {
+            e.preventDefault();
+            const dest = this.getAttribute('data-href');
+            openAuthModal(dest);
+        });
+    });
+
+    async function loadHomepage() {
+        try {
+            const [upcoming, resources] = await Promise.all([apiFetch('/events/upcoming'), apiFetch('/resources')]);
+            const allEvents = await apiFetch('/events');
+            const venues = resources.filter(r => r.type === 'VENUE' && r.available);
+            const equipment = resources.filter(r => r.type === 'EQUIPMENT');
+
+            document.getElementById('statTotal').textContent = allEvents.length;
+            document.getElementById('statUpcoming').textContent = upcoming.length;
+            document.getElementById('statVenues').textContent = venues.length;
+            document.getElementById('statEquipment').textContent = equipment.length;
+
+            const grid = document.getElementById('eventsGrid');
+            // Show only first 4 upcoming events
+            const shown = upcoming.slice(0, 6);
+            if (shown.length === 0) {
+                grid.innerHTML = '<p>No upcoming events found.</p>';
+                return;
+            }
+
+            grid.innerHTML = shown.map((ev, i) => `
+                <div class="card">
+                    <img class="card-img" src="${ev.imageUrl || '/images/events/default-event.jpg'}" alt="${ev.title}" onerror="this.src='/images/events/default-event.jpg'">
+                    <div class="card-body">
+                        <div class="card-title">${ev.title}</div>
+                        <div class="card-meta">
+                            <div class="card-meta-item"><span class="icon">📍</span><span>${ev.resource ? ev.resource.name : '—'}</span></div>
+                            <div class="card-meta-item"><span class="icon">📅</span><span>${formatDate(ev.eventDate)}</span></div>
+                            <div class="card-meta-item"><span class="icon">👤</span><span>${ev.organizerName}</span></div>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        } catch (err) {
+            document.getElementById('eventsGrid').innerHTML = `<p>⚠ Could not load events.<br><small>${err.message}</small></p>`;
+        }
+    }
+
+    loadHomepage();
+</script>
+
+<!-- Import Navbar Script -->
+<div th:replace="navbar :: navbar-script"></div>
+
+</body>
+</html>
