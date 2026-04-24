@@ -1,364 +1,607 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-    <title>All Bookings — Event Management System</title>
-    <link rel="stylesheet" href="css/style.css"/>
+    <title>Manage Events — Admin</title>
+    <link rel="stylesheet" href="/css/style.css"/>
+    <style>
+        .admin-wrapper {
+            display: flex;
+            min-height: calc(100vh - 68px);
+        }
+
+        .admin-sidebar {
+            width: 280px;
+            background: var(--navy);
+            position: fixed;
+            height: calc(100vh - 68px);
+            overflow-y: auto;
+        }
+
+        .admin-content {
+            flex: 1;
+            margin-left: 280px;
+            padding: 2rem;
+            background: var(--off-white);
+        }
+
+        .admin-nav-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 14px 24px;
+            color: rgba(255,255,255,0.7);
+            text-decoration: none;
+            transition: all 0.3s ease;
+            border-left: 3px solid transparent;
+        }
+
+        .admin-nav-item:hover {
+            background: rgba(255,255,255,0.1);
+            color: var(--gold);
+        }
+
+        .admin-nav-item.active {
+            background: rgba(255,255,255,0.1);
+            color: var(--gold);
+            border-left-color: var(--gold);
+        }
+
+        .event-card {
+            background: white;
+            border-radius: 8px;
+            padding: 1.2rem;
+            margin-bottom: 1rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            border-left: 4px solid var(--gold);
+        }
+
+        .event-title {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: var(--navy);
+            margin-bottom: 0.5rem;
+        }
+
+        .event-details {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem;
+            margin-bottom: 0.8rem;
+            font-size: 0.85rem;
+            color: var(--gray-500);
+        }
+
+        .event-description {
+            color: var(--gray-700);
+            margin-bottom: 1rem;
+            font-size: 0.9rem;
+        }
+
+        .btn-sm {
+            padding: 6px 16px;
+            font-size: 0.8rem;
+            margin-right: 8px;
+        }
+
+        .btn-success {
+            background: var(--success);
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #1e5a3a;
+        }
+
+        .section-tab {
+            margin-bottom: 2rem;
+        }
+
+        .section-tab h3 {
+            color: var(--navy);
+            margin-bottom: 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 2px solid var(--gold);
+            display: inline-block;
+        }
+
+        /* Center Screen Confirm Dialog */
+        .toast-confirm {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(0.9);
+            background: var(--white);
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-lg);
+            z-index: 10000;
+            transition: transform 0.2s ease, opacity 0.2s ease;
+            min-width: 320px;
+            max-width: 450px;
+            border-left: 4px solid var(--gold);
+            opacity: 0;
+            visibility: hidden;
+        }
+
+        .toast-confirm.show {
+            transform: translate(-50%, -50%) scale(1);
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .toast-confirm-content {
+            padding: 1.5rem 2rem;
+            text-align: center;
+        }
+
+        .toast-confirm-message {
+            display: block;
+            font-size: 1rem;
+            color: var(--text);
+            margin-bottom: 1.5rem;
+            font-weight: 500;
+        }
+
+        .toast-confirm-buttons {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+        }
+
+        .toast-confirm-btn {
+            padding: 8px 24px;
+            border-radius: var(--radius);
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+            border: none;
+        }
+
+        .toast-confirm-btn.confirm {
+            background: var(--gold);
+            color: var(--white);
+        }
+
+        .toast-confirm-btn.confirm:hover {
+            background: var(--gold-light);
+            transform: translateY(-1px);
+        }
+
+        .toast-confirm-btn.cancel {
+            background: var(--gray-300);
+            color: var(--gray-700);
+        }
+
+        .toast-confirm-btn.cancel:hover {
+            background: var(--gray-500);
+            color: var(--white);
+        }
+
+        /* Modal Overlay Background */
+        .modal-backdrop {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 9999;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.2s ease;
+        }
+
+        .modal-backdrop.show {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        /* Table Styles */
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            border-radius: var(--radius-lg);
+            overflow: hidden;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .data-table th {
+            background: var(--navy);
+            color: white;
+            padding: 12px 16px;
+            text-align: left;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+
+        .data-table td {
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--gray-100);
+            color: var(--gray-700);
+            font-size: 0.85rem;
+        }
+
+        .data-table tr:hover {
+            background: var(--off-white);
+        }
+
+        .badge-pending, .badge-approved, .badge-cancelled {
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 0.7rem;
+            font-weight: 700;
+            display: inline-block;
+        }
+
+        .badge-pending { background: #fff3cd; color: #856404; }
+        .badge-approved { background: #d1f0e0; color: #155724; }
+        .badge-cancelled { background: #f8d7da; color: #721c24; }
+
+        .table-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+            margin-top: 2rem;
+        }
+
+        .filter-bar {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .filter-bar input, .filter-bar select {
+            padding: 8px 12px;
+            border: 1.5px solid var(--gray-300);
+            border-radius: var(--radius);
+            font-size: 0.85rem;
+        }
+
+        .filter-bar input {
+            flex: 1;
+            min-width: 200px;
+        }
+
+        @media (max-width: 768px) {
+            .admin-sidebar { display: none; }
+            .admin-content { margin-left: 0; }
+            .data-table { font-size: 0.75rem; }
+            .data-table th, .data-table td { padding: 8px 10px; }
+        }
+    </style>
 </head>
 <body>
 
-<!-- ========== NAVBAR ========== -->
+<!-- Navbar -->
 <nav class="navbar">
-    <a href="index.html" class="nav-brand">
-        <img src="images/logo.png" alt="Logo" onerror="this.style.display='none'"/>
+    <a href="/" class="nav-brand">
+        <img src="/images/logo2.png" alt="Logo" onerror="this.style.display='none'"/>
         <div class="nav-brand-text">
             <div class="title">University of Ruhuna</div>
             <div class="sub">Faculty of Technology</div>
         </div>
     </a>
     <ul class="nav-links">
-        <li><a href="index.html">Home</a></li>
-        <li><a href="events.html" class="active">Events</a></li>
-        <li><a href="booking.html">Book Event</a></li>
-        <li><a href="resources.html">Resources</a></li>
-        <li><a href="booking.html" class="btn-nav-login">+ New Booking</a></li>
+        <li><a href="/">Home</a></li>
+        <li><a href="/logout" class="btn-nav-login">Logout</a></li>
     </ul>
 </nav>
 
-<!-- ========== PAGE HEADER ========== -->
-<div class="page-header">
-    <div class="container">
-        <div class="breadcrumb">
-            <a href="index.html">Home</a>
-            <span>›</span>
-            <span>Event Bookings</span>
-        </div>
-        <h1>📋 All Event Bookings</h1>
-        <p>View and manage all resource/venue bookings</p>
+<div class="admin-wrapper">
+    <!-- Sidebar -->
+    <div class="admin-sidebar">
+        <a href="/admin/dashboard" class="admin-nav-item">
+            <span>📊</span> Dashboard
+        </a>
+        <a href="/admin/events" class="admin-nav-item active">
+            <span>📅</span> Event Requests
+        </a>
+        <a href="/admin/resources" class="admin-nav-item">
+            <span>🪑</span> Manage Resources
+        </a>
+        <a href="/admin/levels" class="admin-nav-item">
+            <span>📚</span> Manage Level Ranges
+        </a>
+        <a href="/admin/users" class="admin-nav-item">
+            <span>👥</span> Manage Users
+        </a>
     </div>
-</div>
 
-<!-- ========== MAIN CONTENT ========== -->
-<main>
-    <div class="container">
+    <!-- Main Content -->
+    <div class="admin-content">
+        <h1 class="section-title">Event Requests</h1>
+        <div class="divider"></div>
 
-        <!-- Filters row -->
-        <div style="display:flex;gap:1rem;align-items:center;flex-wrap:wrap;margin-bottom:1.5rem;">
-            <select class="form-control" id="filterStatus" style="width:180px;"
-                    onchange="filterEvents()">
-                <option value="">All Statuses</option>
+        <!-- Pending Events -->
+        <div class="section-tab">
+            <h3>⏳ Pending Events</h3>
+            <div th:if="${pendingEvents.isEmpty()}" style="color: var(--gray-500); padding: 1rem;">
+                No pending events
+            </div>
+            <div th:each="event : ${pendingEvents}" class="event-card">
+                <div class="event-title" th:text="${event.title}">Event Title</div>
+                <div class="event-details">
+                    <span>📅 <span th:text="${event.eventDate}">Date</span></span>
+                    <span>👤 <span th:text="${event.organizerName}">Organizer</span></span>
+                    <span>📧 <span th:text="${event.contactEmail}">Email</span></span>
+                    <span>🕐 <span th:text="${event.startTime}">Start</span> - <span th:text="${event.endTime}">End</span></span>
+                </div>
+                <div class="event-description" th:text="${event.description}">Description</div>
+                <div>
+                    <button class="btn btn-success btn-sm" th:data-id="${event.id}" th:data-title="${event.title}" onclick="approveEvent(this.getAttribute('data-id'), this.getAttribute('data-title'))">✅ Approve</button>
+                    <button class="btn btn-danger btn-sm" th:data-id="${event.id}" th:data-title="${event.title}" onclick="rejectEvent(this.getAttribute('data-id'), this.getAttribute('data-title'))">❌ Reject</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Approved Events -->
+        <div class="section-tab">
+            <h3>✅ Approved Events</h3>
+            <div th:if="${approvedEvents.isEmpty()}" style="color: var(--gray-500); padding: 1rem;">
+                No approved events
+            </div>
+            <div th:each="event : ${approvedEvents}" class="event-card" style="border-left-color: var(--success);">
+                <div class="event-title" th:text="${event.title}">Event Title</div>
+                <div class="event-details">
+                    <span>📅 <span th:text="${event.eventDate}">Date</span></span>
+                    <span>👤 <span th:text="${event.organizerName}">Organizer</span></span>
+                </div>
+                <span class="badge-approved">APPROVED</span>
+            </div>
+        </div>
+
+        <!-- Cancelled/Rejected Events -->
+        <div class="section-tab">
+            <h3>❌ Cancelled Events</h3>
+            <div th:if="${cancelledEvents.isEmpty()}" style="color: var(--gray-500); padding: 1rem;">
+                No cancelled events
+            </div>
+            <div th:each="event : ${cancelledEvents}" class="event-card" style="border-left-color: var(--danger);">
+                <div class="event-title" th:text="${event.title}">Event Title</div>
+                <div class="event-details">
+                    <span>📅 <span th:text="${event.eventDate}">Date</span></span>
+                    <span>👤 <span th:text="${event.organizerName}">Organizer</span></span>
+                </div>
+                <span class="badge-cancelled">CANCELLED</span>
+            </div>
+        </div>
+
+        <!-- ========== ADDITIONAL: ALL EVENTS TABLE ========== -->
+        <div class="table-header">
+            <h2>📋 All Events (Full List)</h2>
+            <span id="allEventsCount" style="font-size:0.85rem;color:var(--gray-500);"></span>
+        </div>
+
+        <div class="filter-bar">
+            <input type="text" id="searchInput" placeholder="🔍 Search by title, organizer or email...">
+            <select id="statusFilter">
+                <option value="all">All Status</option>
                 <option value="PENDING">Pending</option>
                 <option value="APPROVED">Approved</option>
                 <option value="CANCELLED">Cancelled</option>
             </select>
-            <input type="text" class="form-control" id="searchInput"
-                   placeholder="🔍  Search by title or organizer..."
-                   style="max-width:300px;" oninput="filterEvents()"/>
-            <div style="margin-left:auto;">
-                <a href="booking.html" class="btn btn-gold">+ New Booking</a>
-            </div>
+            <button class="btn btn-primary btn-sm" onclick="filterEvents()">Search</button>
         </div>
 
-        <!-- Alert -->
-        <div class="alert alert-success" id="successAlert"></div>
-        <div class="alert alert-danger"  id="errorAlert"></div>
-
-        <!-- Table wrapper -->
         <div class="table-wrapper">
-            <div class="table-header">
-                <h2>Bookings</h2>
-                <span id="countLabel" style="font-size:0.85rem;color:var(--gray-500);"></span>
-            </div>
-            <div style="overflow-x:auto;">
-                <table class="data-table" id="eventsTable">
+            <div style="overflow-x: auto;">
+                <table class="data-table">
                     <thead>
                     <tr>
-                        <th>#</th>
-                        <th>Event Title</th>
-                        <th>Resource</th>
-                        <th>Type</th>
-                        <th>Date</th>
+                        <th>ID</th>
+                        <th>Title</th>
+                        <th>Event Date</th>
                         <th>Organizer</th>
+                        <th>Email</th>
+                        <th>Resource</th>
                         <th>Status</th>
                         <th>Actions</th>
-                    </tr>
                     </thead>
-                    <tbody id="eventsBody">
-                    <tr><td colspan="8" style="text-align:center;padding:2rem;color:var(--gray-500);">
-                        Loading bookings...
-                    </td></tr>
+                    <tbody id="allEventsTableBody">
+                    <tr><td colspan="8" style="text-align:center;padding:2rem;">Loading events...</td></tr>
                     </tbody>
                 </table>
             </div>
         </div>
-
-    </div>
-</main>
-
-<!-- ========== VIEW MODAL ========== -->
-<div class="modal-overlay" id="viewModal">
-    <div class="modal">
-        <div class="modal-header">
-            <h3>📋 Booking Details</h3>
-            <button class="modal-close" onclick="closeModal('viewModal')">×</button>
-        </div>
-        <div class="modal-body" id="viewModalBody">
-        </div>
-        <div class="modal-footer">
-            <button class="btn btn-outline" onclick="closeModal('viewModal')">Close</button>
-        </div>
     </div>
 </div>
 
-<!-- ========== EDIT MODAL ========== -->
-<div class="modal-overlay" id="editModal">
-    <div class="modal">
-        <div class="modal-header">
-            <h3>✏️ Edit Booking</h3>
-            <button class="modal-close" onclick="closeModal('editModal')">×</button>
-        </div>
-        <div class="modal-body">
-            <input type="hidden" id="editId"/>
-            <div class="form-group">
-                <label class="form-label">Event Title <span class="required">*</span></label>
-                <input type="text" class="form-control" id="editTitle"/>
-            </div>
-            <div class="form-row">
-                <div class="form-group">
-                    <label class="form-label">Organizer Name <span class="required">*</span></label>
-                    <input type="text" class="form-control" id="editOrganizer"/>
-                </div>
-                <div class="form-group">
-                    <label class="form-label">Contact Email <span class="required">*</span></label>
-                    <input type="email" class="form-control" id="editEmail"/>
-                </div>
-            </div>
-            <div class="form-row">
-                <div class="form-group">
-                    <label class="form-label">Event Date <span class="required">*</span></label>
-                    <input type="date" class="form-control" id="editDate" onchange="checkEditAvailability()"/>
-                </div>
-                <div class="form-group">
-                    <label class="form-label">Resource <span class="required">*</span></label>
-                    <select class="form-control" id="editResource" onchange="checkEditAvailability()"></select>
-                </div>
-            </div>
-            <div id="editAvailability" style="margin-bottom:0.8rem;font-size:0.85rem;"></div>
-            <div class="form-row">
-                <div class="form-group">
-                    <label class="form-label">Start Time</label>
-                    <input type="time" class="form-control" id="editStartTime"/>
-                </div>
-                <div class="form-group">
-                    <label class="form-label">End Time</label>
-                    <input type="time" class="form-control" id="editEndTime"/>
-                </div>
-            </div>
-            <div class="form-row">
-                <div class="form-group">
-                    <label class="form-label">Status</label>
-                    <select class="form-control" id="editStatus">
-                        <option value="PENDING">Pending</option>
-                        <option value="APPROVED">Approved</option>
-                        <option value="CANCELLED">Cancelled</option>
-                    </select>
-                </div>
-            </div>
-            <div class="form-group">
-                <label class="form-label">Notes</label>
-                <textarea class="form-control" id="editNotes" rows="2"></textarea>
-            </div>
-            <div class="alert alert-danger" id="editError"></div>
-        </div>
-        <div class="modal-footer">
-            <button class="btn btn-outline" onclick="closeModal('editModal')">Cancel</button>
-            <button class="btn btn-primary" onclick="saveEdit()" id="editSaveBtn">Save Changes</button>
-        </div>
-    </div>
-</div>
-
-<!-- ========== FOOTER ========== -->
-<footer>
-    <p>© 2026 <strong>University of Ruhuna</strong> | Faculty of Technology — Event Management System</p>
-</footer>
-
-<div id="toast"></div>
-<script src="js/api.js"></script>
 <script>
+    let activeBackdrop = null;
     let allEvents = [];
 
-    async function loadEvents() {
-        try {
-            allEvents = await apiFetch('/events');
-            renderTable(allEvents);
-        } catch (err) {
-            document.getElementById('eventsBody').innerHTML =
-                `<tr><td colspan="8" style="text-align:center;padding:2rem;color:var(--danger);">
-        ⚠ Cannot connect to backend. Ensure Spring Boot is running at <strong>localhost:8080</strong>.
-        <br><small>${err.message}</small>
-      </td></tr>`;
-        }
+    // Show custom toast notification
+    function showToast(message, type) {
+        const toast = document.createElement('div');
+        toast.className = `toast-notification ${type}`;
+        toast.innerHTML = `<div class="toast-content">${message}</div>`;
+        document.body.appendChild(toast);
+        setTimeout(() => toast.classList.add('show'), 10);
+        setTimeout(() => {
+            toast.classList.remove('show');
+            setTimeout(() => toast.remove(), 300);
+        }, 3000);
     }
 
-    function renderTable(events) {
-        const tbody = document.getElementById('eventsBody');
-        document.getElementById('countLabel').textContent = `${events.length} record(s) found`;
-        if (events.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="8">
-      <div class="empty-state"><div class="icon">📭</div><p>No bookings found.</p></div>
-    </td></tr>`;
-            return;
+    // Custom confirmation dialog (center screen)
+    function showConfirmDialog(message, confirmText, cancelText, onConfirm) {
+        const existing = document.querySelector('.toast-confirm');
+        if (existing) existing.remove();
+        if (activeBackdrop) activeBackdrop.remove();
+
+        const backdrop = document.createElement('div');
+        backdrop.className = 'modal-backdrop';
+        document.body.appendChild(backdrop);
+        setTimeout(() => backdrop.classList.add('show'), 10);
+        activeBackdrop = backdrop;
+
+        const modal = document.createElement('div');
+        modal.className = 'toast-confirm';
+        modal.innerHTML = `
+            <div class="toast-confirm-content">
+                <span class="toast-confirm-message">${message}</span>
+                <div class="toast-confirm-buttons">
+                    <button class="toast-confirm-btn cancel">${cancelText}</button>
+                    <button class="toast-confirm-btn confirm">${confirmText}</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+        setTimeout(() => modal.classList.add('show'), 10);
+
+        const closeDialog = () => {
+            modal.classList.remove('show');
+            backdrop.classList.remove('show');
+            setTimeout(() => {
+                modal.remove();
+                backdrop.remove();
+                activeBackdrop = null;
+            }, 300);
+        };
+
+        modal.querySelector('.cancel').onclick = closeDialog;
+        modal.querySelector('.confirm').onclick = () => {
+            closeDialog();
+            onConfirm();
+        };
+    }
+
+    function approveEvent(id, title) {
+        showConfirmDialog(`✅ Approve "${title}"?`, 'Approve', 'Cancel', () => {
+            fetch(`/admin/event/approve/${id}`, { method: 'POST' })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        showToast('✅ Event approved successfully!', 'success');
+                        setTimeout(() => location.reload(), 1500);
+                    } else {
+                        showToast('❌ Failed to approve event', 'error');
+                    }
+                });
+        });
+    }
+
+    function rejectEvent(id, title) {
+        showConfirmDialog(`❌ Reject "${title}"?`, 'Reject', 'Cancel', () => {
+            fetch(`/admin/event/reject/${id}`, { method: 'POST' })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        showToast('❌ Event rejected', 'warning');
+                        setTimeout(() => location.reload(), 1500);
+                    } else {
+                        showToast('❌ Failed to reject event', 'error');
+                    }
+                });
+        });
+    }
+
+    // ========== ALL EVENTS TABLE FUNCTIONS ==========
+    async function loadAllEvents() {
+        try {
+            const response = await fetch('/api/events');
+            allEvents = await response.json();
+            filterEvents();
+        } catch (error) {
+            console.error('Error loading events:', error);
+            document.getElementById('allEventsTableBody').innerHTML = '<tr><td colspan="8" style="text-align:center;color:red;">Failed to load events</td></tr>';
         }
-        tbody.innerHTML = events.map((ev, i) => `
-    <tr>
-      <td>${i + 1}</td>
-      <td><strong>${ev.title}</strong></td>
-      <td>${ev.resource ? ev.resource.name : '—'}</td>
-      <td>${ev.resource ? typeBadge(ev.resource.type) : '—'}</td>
-      <td>${formatDate(ev.eventDate)}</td>
-      <td>${ev.organizerName}</td>
-      <td>${statusBadge(ev.status)}</td>
-      <td>
-        <button class="btn btn-sm btn-outline" onclick="viewEvent(${ev.id})" title="View">👁 View</button>
-        <button class="btn btn-sm btn-primary" onclick="editEvent(${ev.id})" title="Edit" style="margin-left:4px;">✏️</button>
-        <button class="btn btn-sm btn-danger"  onclick="deleteEvent(${ev.id})" title="Delete" style="margin-left:4px;">🗑</button>
-      </td>
-    </tr>
-  `).join('');
     }
 
     function filterEvents() {
-        const status = document.getElementById('filterStatus').value;
-        const search = document.getElementById('searchInput').value.toLowerCase();
-        const filtered = allEvents.filter(ev => {
-            const matchStatus = !status || ev.status === status;
-            const matchSearch = !search ||
-                ev.title.toLowerCase().includes(search) ||
-                ev.organizerName.toLowerCase().includes(search);
-            return matchStatus && matchSearch;
-        });
-        renderTable(filtered);
-    }
+        const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+        const statusFilter = document.getElementById('statusFilter').value;
 
-    function viewEvent(id) {
-        const ev = allEvents.find(e => e.id === id);
-        if (!ev) return;
-        document.getElementById('viewModalBody').innerHTML = `
-    <table style="width:100%;border-collapse:collapse;font-size:0.9rem;">
-      ${row('Title', `<strong>${ev.title}</strong>`)}
-      ${row('Description', ev.description || '—')}
-      ${row('Resource', ev.resource ? ev.resource.name : '—')}
-      ${row('Type', ev.resource ? typeBadge(ev.resource.type) : '—')}
-      ${row('Date', formatDate(ev.eventDate))}
-      ${row('Time', ev.startTime ? `${ev.startTime} – ${ev.endTime || '?'}` : '—')}
-      ${row('Organizer', ev.organizerName)}
-      ${row('Email', `<a href="mailto:${ev.contactEmail}">${ev.contactEmail}</a>`)}
-      ${row('Status', statusBadge(ev.status))}
-      ${row('Notes', ev.notes || '—')}
-    </table>`;
-        openModal('viewModal');
-    }
+        let filtered = [...allEvents];
 
-    function row(label, val) {
-        return `<tr>
-    <td style="padding:8px 12px;font-weight:600;color:var(--navy);width:38%;border-bottom:1px solid var(--gray-100);">${label}</td>
-    <td style="padding:8px 12px;border-bottom:1px solid var(--gray-100);">${val}</td>
-  </tr>`;
-    }
+        if (searchTerm) {
+            filtered = filtered.filter(event =>
+                event.title.toLowerCase().includes(searchTerm) ||
+                (event.organizerName && event.organizerName.toLowerCase().includes(searchTerm)) ||
+                (event.contactEmail && event.contactEmail.toLowerCase().includes(searchTerm))
+            );
+        }
 
-    async function editEvent(id) {
-        const ev = allEvents.find(e => e.id === id);
-        if (!ev) return;
-        await loadResourceSelect('editResource');
-        document.getElementById('editId').value         = ev.id;
-        document.getElementById('editTitle').value      = ev.title;
-        document.getElementById('editOrganizer').value  = ev.organizerName;
-        document.getElementById('editEmail').value      = ev.contactEmail;
-        document.getElementById('editDate').value       = ev.eventDate;
-        document.getElementById('editStartTime').value  = ev.startTime || '';
-        document.getElementById('editEndTime').value    = ev.endTime || '';
-        document.getElementById('editNotes').value      = ev.notes || '';
-        document.getElementById('editStatus').value     = ev.status;
-        document.getElementById('editResource').value   = ev.resource ? ev.resource.id : '';
-        document.getElementById('editError').className  = 'alert alert-danger';
-        document.getElementById('editAvailability').innerHTML = '';
-        openModal('editModal');
-    }
+        if (statusFilter !== 'all') {
+            filtered = filtered.filter(event => event.status === statusFilter);
+        }
 
-    async function checkEditAvailability() {
-        const rid  = document.getElementById('editResource').value;
-        const date = document.getElementById('editDate').value;
-        const el   = document.getElementById('editAvailability');
-        await checkAvailability(rid, date, el);
-    }
+        document.getElementById('allEventsCount').textContent = `${filtered.length} events`;
 
-    async function saveEdit() {
-        const id      = document.getElementById('editId').value;
-        const title   = document.getElementById('editTitle').value.trim();
-        const name    = document.getElementById('editOrganizer').value.trim();
-        const email   = document.getElementById('editEmail').value.trim();
-        const date    = document.getElementById('editDate').value;
-        const rid     = document.getElementById('editResource').value;
-        const status  = document.getElementById('editStatus').value;
-        const errEl   = document.getElementById('editError');
+        const tbody = document.getElementById('allEventsTableBody');
 
-        if (!title || !name || !email || !date || !rid) {
-            errEl.textContent = 'Please fill in all required fields.';
-            errEl.classList.add('show');
+        if (filtered.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:2rem;">No events found</td></tr>';
             return;
         }
 
-        const btn = document.getElementById('editSaveBtn');
-        btn.disabled = true;
-        btn.innerHTML = '<span class="spinner"></span> Saving...';
+        tbody.innerHTML = filtered.map(event => `
+            <tr>
+                <td>${event.id}</td>
+                <td><strong>${escapeHtml(event.title)}</strong></td>
+                <td>${formatDate(event.eventDate)}</td>
+                <td>${escapeHtml(event.organizerName)}</td>
+                <td>${escapeHtml(event.contactEmail)}</td>
+                <td>${event.resource ? event.resource.name : '-'}</td>
+                <td>${getStatusBadge(event.status)}</td>
+                <td>
+                    <button class="btn btn-sm btn-danger" onclick="deleteEvent(${event.id}, '${escapeHtml(event.title)}')">🗑️ Delete</button>
+                </td>
+            </tr>
+        `).join('');
+    }
 
-        try {
-            await apiFetch(`/events/${id}`, {
-                method: 'PUT',
-                body: JSON.stringify({
-                    title, organizerName: name, contactEmail: email,
-                    eventDate: date, startTime: document.getElementById('editStartTime').value,
-                    endTime: document.getElementById('editEndTime').value,
-                    notes: document.getElementById('editNotes').value,
-                    status,
-                    resource: { id: parseInt(rid) }
-                })
-            });
-            closeModal('editModal');
-            showToast('Booking updated successfully!', 'success');
-            await loadEvents();
-        } catch (err) {
-            errEl.textContent = err.message;
-            errEl.classList.add('show');
-        } finally {
-            btn.disabled = false;
-            btn.textContent = 'Save Changes';
+    function getStatusBadge(status) {
+        switch(status) {
+            case 'PENDING': return '<span class="badge-pending">⏳ Pending</span>';
+            case 'APPROVED': return '<span class="badge-approved">✅ Approved</span>';
+            case 'CANCELLED': return '<span class="badge-cancelled">❌ Cancelled</span>';
+            default: return status;
         }
     }
 
-    function deleteEvent(id) {
-        confirmDelete(async () => {
-            try {
-                await apiFetch(`/events/${id}`, { method: 'DELETE' });
-                showToast('Booking deleted.', 'success');
-                await loadEvents();
-            } catch (err) {
-                showToast(err.message, 'error');
-            }
+    function formatDate(dateStr) {
+        if (!dateStr) return '-';
+        const d = new Date(dateStr);
+        return d.toLocaleDateString('en-GB');
+    }
+
+    function escapeHtml(str) {
+        if (!str) return '';
+        return str.replace(/[&<>]/g, function(m) {
+            if (m === '&') return '&amp;';
+            if (m === '<') return '&lt;';
+            if (m === '>') return '&gt;';
+            return m;
         });
     }
 
-    function openModal(id)  { document.getElementById(id).classList.add('open'); }
-    function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+    function deleteEvent(id, title) {
+        showConfirmDialog(`🗑️ Delete "${title}"?`, 'Delete', 'Cancel', () => {
+            fetch(`/api/events/${id}`, { method: 'DELETE' })
+                .then(response => {
+                    if (response.ok) {
+                        showToast('✅ Event deleted successfully!', 'success');
+                        loadAllEvents();
+                        setTimeout(() => location.reload(), 1500);
+                    } else {
+                        showToast('❌ Failed to delete event', 'error');
+                    }
+                })
+                .catch(() => {
+                    showToast('❌ Failed to delete event', 'error');
+                });
+        });
+    }
 
-    window.addEventListener('click', e => {
-        if (e.target.classList.contains('modal-overlay')) {
-            e.target.classList.remove('open');
-        }
-    });
-
-    loadEvents();
+    // Load all events when page loads
+    loadAllEvents();
 </script>
+
 </body>
 </html>
