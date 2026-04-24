@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Admin Dashboard — Event Management System</title>
+    <link rel="stylesheet" href="/css/style.css"/>
+    <style>
+        .admin-wrapper {
+            display: flex;
+            min-height: calc(100vh - 68px);
+        }
+
+        .admin-sidebar {
+            width: 280px;
+            background: var(--navy);
+            position: fixed;
+            height: calc(100vh - 68px);
+            overflow-y: auto;
+        }
+
+        .admin-content {
+            flex: 1;
+            margin-left: 280px;
+            padding: 2rem;
+            background: var(--off-white);
+        }
+
+        .admin-nav-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 14px 24px;
+            color: rgba(255,255,255,0.7);
+            text-decoration: none;
+            transition: all 0.3s ease;
+            border-left: 3px solid transparent;
+        }
+
+        .admin-nav-item:hover {
+            background: rgba(255,255,255,0.1);
+            color: var(--gold);
+        }
+
+        .admin-nav-item.active {
+            background: rgba(255,255,255,0.1);
+            color: var(--gold);
+            border-left-color: var(--gold);
+        }
+
+        .stats-grid-admin {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .stat-card-admin {
+            background: white;
+            padding: 1.5rem;
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-sm);
+            border-left: 4px solid var(--gold);
+            transition: var(--transition);
+        }
+
+        .stat-card-admin:hover {
+            transform: translateY(-3px);
+            box-shadow: var(--shadow-md);
+        }
+
+        .stat-number {
+            font-size: 2.2rem;
+            font-weight: 700;
+            color: var(--navy);
+            font-family: 'Merriweather', serif;
+        }
+
+        .stat-label {
+            color: var(--gray-500);
+            font-size: 0.85rem;
+            margin-top: 0.5rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .welcome-banner {
+            background: linear-gradient(135deg, var(--navy) 0%, var(--navy-light) 100%);
+            border-radius: var(--radius-lg);
+            padding: 1.5rem 2rem;
+            margin-bottom: 2rem;
+            color: white;
+        }
+
+        .welcome-banner h2 {
+            font-family: 'Merriweather', serif;
+            margin-bottom: 0.5rem;
+        }
+
+        .welcome-banner p {
+            opacity: 0.8;
+        }
+
+        @media (max-width: 768px) {
+            .admin-sidebar {
+                display: none;
+            }
+            .admin-content {
+                margin-left: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<!-- Navbar -->
+<nav class="navbar">
+    <a href="/" class="nav-brand">
+        <img src="/images/logo2.png" alt="Logo" onerror="this.style.display='none'"/>
+        <div class="nav-brand-text">
+            <div class="title">University of Ruhuna</div>
+            <div class="sub">Faculty of Technology</div>
+        </div>
+    </a>
+    <ul class="nav-links">
+        <li><a href="/">Home</a></li>
+        <li><a href="/index" class="btn-nav-login">Logout</a></li>
+    </ul>
+</nav>
+
+<div class="admin-wrapper">
+    <!-- Sidebar -->
+    <div class="admin-sidebar">
+        <a href="/admin/dashboard" class="admin-nav-item active">
+            <span>📊</span> Dashboard
+        </a>
+        <a href="/admin/events" class="admin-nav-item">
+            <span>📅</span> Event Requests
+        </a>
+        <a href="/admin/resources" class="admin-nav-item">
+            <span>🪑</span> Manage Resources
+        </a>
+        <a href="/admin/levels" class="admin-nav-item">
+            <span>📚</span> Manage Level Ranges
+        </a>
+        <a href="/admin/users" class="admin-nav-item">
+            <span>👥</span> Manage Users
+        </a>
+    </div>
+
+    <!-- Main Content -->
+    <div class="admin-content">
+        <!-- Welcome Banner -->
+        <div class="welcome-banner">
+            <h2>Welcome, Admin!</h2>
+            <p>Here's what's happening with your Event Management System today.</p>
+        </div>
+
+        <!-- Statistics Cards -->
+        <div class="stats-grid-admin">
+            <div class="stat-card-admin">
+                <div class="stat-number" th:text="${totalEvents}">0</div>
+                <div class="stat-label">Total Events</div>
+            </div>
+            <div class="stat-card-admin">
+                <div class="stat-number" th:text="${pendingEvents}">0</div>
+                <div class="stat-label">Pending Requests</div>
+            </div>
+            <div class="stat-card-admin">
+                <div class="stat-number" th:text="${approvedEvents}">0</div>
+                <div class="stat-label">Approved Events</div>
+            </div>
+            <div class="stat-card-admin">
+                <div class="stat-number" th:text="${totalResources}">0</div>
+                <div class="stat-label">Total Resources</div>
+            </div>
+            <div class="stat-card-admin">
+                <div class="stat-number" th:text="${totalUsers}">0</div>
+                <div class="stat-label">Registered Users</div>
+            </div>
+        </div>
+
+        <!-- Recent Events Table -->
+        <div class="table-wrapper">
+            <div class="table-header">
+                <h2>📋 Recent Events</h2>
+            </div>
+            <table class="data-table">
+                <thead>
+                <tr>
+                    <th>Title</th>
+                    <th>Event Date</th>
+                    <th>Organizer</th>
+                    <th>Status</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="event : ${recentEvents}">
+                    <td><strong th:text="${event.title}">-</strong></td>
+                    <td th:text="${event.eventDate}">-</td>
+                    <td th:text="${event.organizerName}">-</td>
+                    <td>
+                        <span class="badge" th:classappend="${event.status == 'PENDING'} ? 'badge-pending' : (${event.status == 'APPROVED'} ? 'badge-approved' : 'badge-cancelled')" th:text="${event.status}">-</span>
+                    </td>
+                </tr>
+                <tr th:if="${recentEvents.isEmpty()}">
+                    <td colspan="4" style="text-align:center;">No events found</td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+</body>
+</html>
