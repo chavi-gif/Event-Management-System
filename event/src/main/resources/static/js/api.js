@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 // ============================================================
 //  api.js — Shared JS for Event Management System
 //  University of Ruhuna, Faculty of Technology
@@ -136,3 +137,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (link.getAttribute('href') === current) link.classList.add('active');
     });
 });
+=======
+
+>>>>>>> 240f07a23b87b65e546900051203959e476ab603
