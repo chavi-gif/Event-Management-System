@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Resources — Event Management System</title>
+    <link rel="stylesheet" href="/css/style.css"/>
+    <div th:replace="navbar :: navbar-head"></div>
+    <style>
+        .resource-date-check {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            margin-top: 12px;
+            padding-top: 10px;
+            border-top: 1px solid var(--gray-100);
+        }
+        .resource-date-check input {
+            flex: 1;
+            padding: 8px 10px;
+            border: 1.5px solid var(--gray-300);
+            border-radius: var(--radius);
+            font-size: 0.8rem;
+        }
+        .resource-date-check button {
+            padding: 8px 12px;
+            font-size: 0.75rem;
+            white-space: nowrap;
+        }
+        .avail-result {
+            margin-top: 8px;
+            font-size: 0.75rem;
+            text-align: center;
+            padding: 5px;
+            border-radius: var(--radius);
+        }
+        .avail-available {
+            background: #d1f0e0;
+            color: #155724;
+            font-weight: 600;
+        }
+        .avail-booked {
+            background: #f8d7da;
+            color: #721c24;
+            font-weight: 600;
+        }
+        .avail-checking {
+            background: #eef1f5;
+            color: var(--gray-500);
+        }
+        .card {
+            height: auto;
+        }
+        .quantity-badge {
+            display: inline-block;
+            background: #eef1f5;
+            color: var(--info);
+            padding: 2px 8px;
+            border-radius: 20px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            margin-left: 8px;
+        }
+    </style>
+</head>
+<body>
+
+<!-- Import Navbar -->
+<div th:replace="navbar :: navbar"></div>
+
+<!-- ========== PAGE HEADER ========== -->
+<div class="page-header">
+    <div class="container">
+        <div class="breadcrumb">
+            <a href="/">Home</a>
+            <span>›</span>
+            <span>Resources</span>
+        </div>
+        <h1>🏛️ Venues & Equipment</h1>
+        <p>Check availability of venues and equipment by selecting a date</p>
+    </div>
+</div>
+
+<!-- ========== MAIN ========== -->
+<main>
+    <div class="container">
+
+        <div class="alert alert-success" id="successAlert"></div>
+        <div class="alert alert-danger" id="errorAlert"></div>
+
+        <!-- Two column: Venues | Equipment -->
+        <div class="grid-2">
+
+            <!-- VENUES -->
+            <div>
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;">
+                    <div>
+                        <h2 class="section-title" style="font-size:1.2rem;margin-bottom:2px;">📍 Venues</h2>
+                        <div class="divider" style="margin-bottom:0;"></div>
+                    </div>
+                </div>
+                <div id="venueCards">
+                    <p style="color:var(--gray-500);">Loading venues...</p>
+                </div>
+            </div>
+
+            <!-- EQUIPMENT -->
+            <div>
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;">
+                    <div>
+                        <h2 class="section-title" style="font-size:1.2rem;margin-bottom:2px;">🔧 Equipment</h2>
+                        <div class="divider" style="margin-bottom:0;"></div>
+                    </div>
+                </div>
+                <div id="equipmentCards">
+                    <p style="color:var(--gray-500);">Loading equipment...</p>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Add Resource Section - Visible only for Admin -->
+        <div id="addResourceSection" style="margin-top:3rem; display:none;">
+            <h2 class="section-title">➕ Add New Resource</h2>
+            <div class="divider"></div>
+            <div class="form-card" style="max-width:600px;">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label" for="newName">Resource Name <span class="required">*</span></label>
+                        <input type="text" class="form-control" id="newName" placeholder="e.g. Seminar Room A"/>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="newType">Type <span class="required">*</span></label>
+                        <select class="form-control" id="newType">
+                            <option value="VENUE">Venue</option>
+                            <option value="EQUIPMENT">Equipment</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="newDesc">Description</label>
+                    <input type="text" class="form-control" id="newDesc" placeholder="Brief description..."/>
+                </div>
+                <button class="btn btn-gold" onclick="addResource()" id="addBtn">
+                    ➕ Add Resource
+                </button>
+            </div>
+        </div>
+
+    </div>
+</main>
+
+<!-- ========== EDIT RESOURCE MODAL ========== -->
+<div class="modal-overlay" id="editResModal">
+    <div class="modal">
+        <div class="modal-header">
+            <h3>✏️ Edit Resource</h3>
+            <button class="modal-close" onclick="closeModal('editResModal')">×</button>
+        </div>
+        <div class="modal-body">
+            <input type="hidden" id="editResId"/>
+            <div class="form-group">
+                <label class="form-label">Name <span class="required">*</span></label>
+                <input type="text" class="form-control" id="editResName"/>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label">Type <span class="required">*</span></label>
+                    <select class="form-control" id="editResType">
+                        <option value="VENUE">Venue</option>
+                        <option value="EQUIPMENT">Equipment</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Status</label>
+                    <select class="form-control" id="editResAvail">
+                        <option value="true">Available</option>
+                        <option value="false">Unavailable</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Description</label>
+                <input type="text" class="form-control" id="editResDesc"/>
+            </div>
+            <div class="alert alert-danger" id="editResError"></div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-outline" onclick="closeModal('editResModal')">Cancel</button>
+            <button class="btn btn-primary" onclick="saveResourceEdit()" id="editResSaveBtn">Save Changes</button>
+        </div>
+    </div>
+</div>
+
+<!-- ========== FOOTER ========== -->
+<footer>
+    <p>© 2026 <strong>University of Ruhuna</strong> | Faculty of Technology — Event Management System</p>
+</footer>
+
+<div id="toast"></div>
+<script src="/js/api.js"></script>
+<script>
+    const DEFAULT_VENUE = '/images/event-default.jpg';
+
+    let allResources = [];
+
+    // ========== GET CURRENT USER FROM SESSION ==========
+    async function loadCurrentUser() {
+        try {
+            const response = await fetch('/api/current-user');
+            if (response.ok) {
+                const currentUser = await response.json();
+                const isAdmin = currentUser && currentUser.email === 'admin@gmail.com';
+                const addSection = document.getElementById('addResourceSection');
+                if (addSection) {
+                    addSection.style.display = isAdmin ? 'block' : 'none';
+                }
+            }
+        } catch (err) {
+            console.log('Not logged in');
+        }
+    }
+
+    // ========== CHECK AVAILABILITY FOR A RESOURCE ON A DATE ==========
+    async function checkAvailability(resourceId, date, resultElementId) {
+        if (!date) {
+            document.getElementById(resultElementId).innerHTML = '<span class="avail-checking">⚠️ Please select a date</span>';
+            return;
+        }
+
+        document.getElementById(resultElementId).innerHTML = '<span class="avail-checking">🔍 Checking availability...</span>';
+
+        try {
+            const response = await fetch(`/api/events/check-availability?resourceId=${resourceId}&date=${date}`);
+            const data = await response.json();
+
+            if (data.available) {
+                document.getElementById(resultElementId).innerHTML = '<span class="avail-available">✅ Available on ' + formatDateForDisplay(date) + '</span>';
+            } else {
+                document.getElementById(resultElementId).innerHTML = '<span class="avail-booked">❌ Booked on ' + formatDateForDisplay(date) + '</span>';
+            }
+        } catch (err) {
+            document.getElementById(resultElementId).innerHTML = '<span class="avail-booked">⚠️ Error checking availability</span>';
+        }
+    }
+
+    function formatDateForDisplay(dateStr) {
+        if (!dateStr) return '';
+        const parts = dateStr.split('-');
+        return `${parts[2]}/${parts[1]}/${parts[0]}`;
+    }
+
+    // Set min date to today
+    function setMinDateForResource(dateInputId) {
+        const dateInput = document.getElementById(dateInputId);
+        if (dateInput) {
+            dateInput.min = new Date().toISOString().split('T')[0];
+        }
+    }
+
+    // ========== RENDER RESOURCE CARDS WITH QUANTITY ==========
+    function renderResourceCards(resources) {
+        const venues = resources.filter(r => r.type === 'VENUE');
+        const equipment = resources.filter(r => r.type === 'EQUIPMENT');
+
+        const venueContainer = document.getElementById('venueCards');
+        const equipmentContainer = document.getElementById('equipmentCards');
+
+        // Render Venues
+        if (venues.length === 0) {
+            venueContainer.innerHTML = '<p style="color:var(--gray-500);">No venues available.</p>';
+        } else {
+            venueContainer.innerHTML = venues.map(venue => `
+                <div class="card" style="margin-bottom:1rem;">
+                    <img class="card-img" src="${venue.imageUrl || DEFAULT_VENUE}" alt="${venue.name}" onerror="this.src='${DEFAULT_VENUE}'">
+                    <div class="card-body">
+                        <div class="card-title">${venue.name}</div>
+                        <p style="font-size:0.85rem;color:var(--gray-500);margin-bottom:0.8rem;">${venue.description || 'No description'}</p>
+                        <div style="margin-bottom:8px;">
+                            ${venue.available ? '<span class="badge badge-approved">✅ Available for booking</span>' : '<span class="badge badge-cancelled">❌ Temporarily Unavailable</span>'}
+                        </div>
+                        <div class="resource-date-check">
+                            <input type="date" id="date_${venue.id}" class="date-picker" placeholder="Select date">
+                            <button class="btn btn-primary btn-sm" onclick="checkAvailability(${venue.id}, document.getElementById('date_${venue.id}').value, 'avail_result_${venue.id}')">Check</button>
+                        </div>
+                        <div id="avail_result_${venue.id}" class="avail-result"></div>
+                    </div>
+                </div>
+            `).join('');
+
+            venues.forEach(venue => {
+                setMinDateForResource(`date_${venue.id}`);
+            });
+        }
+
+        // Render Equipment WITH QUANTITY DISPLAY
+        if (equipment.length === 0) {
+            equipmentContainer.innerHTML = '<p style="color:var(--gray-500);">No equipment available.</p>';
+        } else {
+            equipmentContainer.innerHTML = equipment.map(eq => `
+                <div class="card" style="margin-bottom:1rem;">
+                    <img class="card-img" src="${eq.imageUrl || DEFAULT_VENUE}" alt="${eq.name}" onerror="this.src='${DEFAULT_VENUE}'">
+                    <div class="card-body">
+                        <div class="card-title">${eq.name}</div>
+                        <p style="font-size:0.85rem;color:var(--gray-500);margin-bottom:0.8rem;">${eq.description || 'No description'}</p>
+                        <div style="margin-bottom:8px; display: flex; align-items: center; justify-content: space-between;">
+                            ${eq.available ? '<span class="badge badge-approved">✅ Available for booking</span>' : '<span class="badge badge-cancelled">❌ Temporarily Unavailable</span>'}
+                            <span class="quantity-badge">📦 Quantity: ${eq.quantity || 1}</span>
+                        </div>
+                        <div class="resource-date-check">
+                            <input type="date" id="date_${eq.id}" class="date-picker" placeholder="Select date">
+                            <button class="btn btn-primary btn-sm" onclick="checkAvailability(${eq.id}, document.getElementById('date_${eq.id}').value, 'avail_result_${eq.id}')">Check</button>
+                        </div>
+                        <div id="avail_result_${eq.id}" class="avail-result"></div>
+                    </div>
+                </div>
+            `).join('');
+
+            equipment.forEach(eq => {
+                setMinDateForResource(`date_${eq.id}`);
+            });
+        }
+    }
+
+    async function loadResources() {
+        try {
+            allResources = await apiFetch('/resources');
+            renderResourceCards(allResources);
+        } catch (err) {
+            const msg = `<p style="color:var(--danger);">⚠ Cannot connect. Ensure backend is running.<br><small>${err.message}</small></p>`;
+            document.getElementById('venueCards').innerHTML = msg;
+            document.getElementById('equipmentCards').innerHTML = msg;
+        }
+    }
+
+    async function addResource() {
+        const name = document.getElementById('newName').value.trim();
+        const type = document.getElementById('newType').value;
+        const description = document.getElementById('newDesc').value.trim();
+
+        if (!name) {
+            showError('Please enter resource name');
+            return;
+        }
+
+        try {
+            await apiFetch('/resources', {
+                method: 'POST',
+                body: JSON.stringify({ name, type, description, available: true })
+            });
+            showSuccess('Resource added successfully!');
+            document.getElementById('newName').value = '';
+            document.getElementById('newDesc').value = '';
+            loadResources();
+        } catch (err) {
+            showError('Failed to add resource: ' + err.message);
+        }
+    }
+
+    async function deleteResource(id) {
+        if (!confirm('Are you sure you want to delete this resource?')) return;
+        try {
+            await apiFetch(`/resources/${id}`, { method: 'DELETE' });
+            showSuccess('Resource deleted successfully!');
+            loadResources();
+        } catch (err) {
+            showError('Failed to delete resource: ' + err.message);
+        }
+    }
+
+    async function openEditResourceModal(id) {
+        const resource = allResources.find(r => r.id === id);
+        if (!resource) return;
+
+        document.getElementById('editResId').value = resource.id;
+        document.getElementById('editResName').value = resource.name;
+        document.getElementById('editResType').value = resource.type;
+        document.getElementById('editResAvail').value = resource.available;
+        document.getElementById('editResDesc').value = resource.description || '';
+        document.getElementById('editResError').style.display = 'none';
+        document.getElementById('editResModal').classList.add('open');
+    }
+
+    async function saveResourceEdit() {
+        const id = document.getElementById('editResId').value;
+        const name = document.getElementById('editResName').value.trim();
+        const type = document.getElementById('editResType').value;
+        const available = document.getElementById('editResAvail').value === 'true';
+        const description = document.getElementById('editResDesc').value.trim();
+
+        if (!name) {
+            document.getElementById('editResError').textContent = 'Name is required';
+            document.getElementById('editResError').style.display = 'block';
+            return;
+        }
+
+        try {
+            await apiFetch(`/resources/${id}`, {
+                method: 'PUT',
+                body: JSON.stringify({ name, type, description, available })
+            });
+            closeModal('editResModal');
+            showSuccess('Resource updated successfully!');
+            loadResources();
+        } catch (err) {
+            document.getElementById('editResError').textContent = err.message;
+            document.getElementById('editResError').style.display = 'block';
+        }
+    }
+
+    function closeModal(modalId) {
+        document.getElementById(modalId).classList.remove('open');
+    }
+
+    function showSuccess(message) {
+        const alert = document.getElementById('successAlert');
+        alert.textContent = message;
+        alert.style.display = 'block';
+        setTimeout(() => alert.style.display = 'none', 3000);
+    }
+
+    function showError(message) {
+        const alert = document.getElementById('errorAlert');
+        alert.textContent = message;
+        alert.style.display = 'block';
+        setTimeout(() => alert.style.display = 'none', 3000);
+    }
+
+    // Initialize page
+    async function init() {
+        await loadCurrentUser();
+        await loadResources();
+    }
+
+    init();
+</script>
+
+<!-- Import Navbar Script -->
+<div th:replace="navbar :: navbar-script"></div>
+
+</body>
+</html>
