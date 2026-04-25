@@ -78,7 +78,7 @@ public class EventController {
         return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
 
-    // ENDPOINT FOR IMAGE UPLOAD WITH ALL RESOURCES IN EQUIPMENT_QUANTITIES
+    // ENDPOINT FOR IMAGE UPLOAD WITH ALL RESOURCES IN E_Quantity
     @PostMapping("/create")
     @ResponseBody
     public ResponseEntity<Map<String, Object>> createEventWithImage(
