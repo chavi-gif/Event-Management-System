@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Book an Event — Event Management System</title>
+    <link rel="stylesheet" href="/css/style.css"/>
+    <div th:replace="navbar :: navbar-head"></div>
+    <style>
+        .resource-group {
+            background: var(--gray-100);
+            border-radius: var(--radius);
+            padding: 1rem;
+            margin-bottom: 1rem;
+        }
+        .resource-group h4 {
+            color: var(--navy);
+            margin-bottom: 0.8rem;
+            font-size: 0.95rem;
+            font-weight: 700;
+        }
+        .checkbox-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 10px;
+        }
+        .checkbox-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 10px;
+            background: var(--white);
+            border-radius: var(--radius);
+            cursor: pointer;
+            transition: var(--transition);
+        }
+        .checkbox-item:hover {
+            background: var(--gold-light);
+            color: var(--white);
+        }
+        .checkbox-item input {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+        .checkbox-item label {
+            cursor: pointer;
+            flex: 1;
+            font-size: 0.85rem;
+        }
+        .resource-type-venue {
+            border-left: 3px solid var(--gold);
+        }
+        .resource-type-equipment {
+            border-left: 3px solid var(--info);
+        }
+        /* Quantity Modal Styles */
+        .quantity-modal {
+            max-width: 400px;
+        }
+        .quantity-input {
+            font-size: 1.2rem;
+            text-align: center;
+        }
+        .available-qty {
+            color: var(--info);
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+
+<!-- Import Navbar -->
+<div th:replace="navbar :: navbar"></div>
+
+<!-- ========== PAGE HEADER ========== -->
+<div class="page-header">
+    <div class="container">
+        <div class="breadcrumb">
+            <a href="/index.html">Home</a>
+            <span>›</span>
+            <a href="/events.html">Events</a>
+            <span>›</span>
+            <span>New Booking</span>
+        </div>
+        <h1>📝 Create New Event Booking</h1>
+        <p>Reserve venues or equipment for your upcoming event</p>
+    </div>
+</div>
+
+<!-- ========== MAIN ========== -->
+<main>
+    <div class="container" style="max-width:760px;">
+
+        <!-- Success / Error alerts -->
+        <div class="alert alert-success" id="successAlert">
+            ✅ <span id="successMsg"></span>
+        </div>
+        <div class="alert alert-danger" id="errorAlert">
+            ❌ <span id="errorMsg"></span>
+        </div>
+
+        <!-- Booking Form -->
+        <div class="form-card">
+            <h2 class="section-title" style="font-size:1.2rem;margin-bottom:0.3rem;">Event Information</h2>
+            <div class="divider"></div>
+
+            <!-- Event Title -->
+            <div class="form-group">
+                <label class="form-label" for="title">Event Title <span class="required">*</span></label>
+                <input type="text" class="form-control" id="title"
+                       placeholder="e.g. Technology Expo 2026" maxlength="100"/>
+            </div>
+
+            <!-- Description -->
+            <div class="form-group">
+                <label class="form-label" for="description">Event Description</label>
+                <textarea class="form-control" id="description" rows="3"
+                          placeholder="Description of the event..."></textarea>
+            </div>
+
+            <!-- Image Upload Field -->
+            <div class="form-group">
+                <label class="form-label" for="eventImage">Event Image</label>
+                <input type="file" class="form-control" id="eventImage" accept="image/*"/>
+                <div class="form-hint">Upload an image for your event (JPG, PNG, GIF)</div>
+            </div>
+
+            <!-- Organizer + Email -->
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label" for="organizerName">Organizer Name <span class="required">*</span></label>
+                    <input type="text" class="form-control" id="organizerName" placeholder="Club name or Level"/>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="contactEmail">Contact Email <span class="required">*</span></label>
+                    <input type="email" class="form-control" id="contactEmail"/>
+                </div>
+            </div>
+
+            <hr style="border:none;border-top:1px solid var(--gray-100);margin:1.2rem 0;"/>
+
+            <h2 class="section-title" style="font-size:1.2rem;margin-bottom:0.3rem;">Resources & Date</h2>
+            <div class="divider"></div>
+
+            <!-- Resources Section with Checkboxes -->
+            <div class="form-group">
+                <label class="form-label">Select Resources <span class="required">*</span></label>
+                <div id="resourcesContainer">
+                    <p style="color:var(--gray-500)">Loading resources...</p>
+                </div>
+                <div class="form-hint">Check all the venues and equipment you need for your event</div>
+            </div>
+
+            <!-- Event Date -->
+            <div class="form-group">
+                <label class="form-label" for="eventDate">Event Date <span class="required">*</span></label>
+                <input type="date" class="form-control" id="eventDate"/>
+                <div class="form-hint">Date must be today or in the future</div>
+            </div>
+
+            <!-- Time -->
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label" for="startTime">Start Time</label>
+                    <input type="time" class="form-control" id="startTime"/>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="endTime">End Time</label>
+                    <input type="time" class="form-control" id="endTime"/>
+                </div>
+            </div>
+
+            <!-- Notes -->
+            <div class="form-group">
+                <label class="form-label" for="notes">Additional Notes</label>
+                <textarea class="form-control" id="notes" rows="2"
+                          placeholder="Any special requirements or notes..."></textarea>
+            </div>
+
+            <!-- Submit Button -->
+            <div style="margin-top:1.5rem; text-align:center;">
+                <button class="btn btn-gold btn-lg" onclick="submitBooking()" id="submitBtn">
+                    📩 Submit Booking
+                </button>
+            </div>
+        </div>
+
+    </div>
+</main>
+
+<!-- ========== QUANTITY SELECTOR MODAL ========== -->
+<div class="modal-overlay" id="quantityModal">
+    <div class="modal quantity-modal">
+        <div class="modal-header">
+            <h3>📦 Select Quantity</h3>
+            <button class="modal-close" onclick="closeQuantityModal()">×</button>
+        </div>
+        <div class="modal-body" style="text-align: center;">
+            <p id="quantityResourceName" style="font-size: 1.1rem; font-weight: 600;"></p>
+            <p>Available: <span id="availableQuantity" class="available-qty">0</span> units</p>
+            <div class="form-group">
+                <label class="form-label">Quantity Required</label>
+                <input type="number" id="selectedQuantity" class="form-control quantity-input" min="1" value="1">
+            </div>
+            <div id="quantityError" class="alert alert-danger" style="display: none; font-size: 0.8rem; margin-top: 10px;"></div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-outline" onclick="closeQuantityModal()">Cancel</button>
+            <button class="btn btn-primary" onclick="confirmQuantity()">Confirm</button>
+        </div>
+    </div>
+</div>
+
+<!-- ========== FOOTER ========== -->
+<footer>
+    <p>© 2026 <strong>University of Ruhuna</strong> | Faculty of Technology — Event Management System</p>
+</footer>
+
+<div id="toast"></div>
+<script src="/js/api.js"></script>
+<script>
+    // Store resources globally
+    let allResources = [];
+    let equipmentQuantities = {};
+    let currentEquipmentId = null;
+    let currentEquipmentName = null;
+    let currentEquipmentMaxQty = 0;
+
+    // Load resources as checkboxes
+    async function loadResourcesAsCheckboxes() {
+        try {
+            const resources = await apiFetch('/resources');
+            allResources = resources;
+
+            const venues = resources.filter(r => r.type === 'VENUE');
+            const equipment = resources.filter(r => r.type === 'EQUIPMENT');
+
+            const container = document.getElementById('resourcesContainer');
+
+            let html = '';
+
+            if (venues.length > 0) {
+                html += `
+                    <div class="resource-group">
+                        <h4>🏛️ Venues</h4>
+                        <div class="checkbox-grid">
+                            ${venues.map(v => `
+                                <div class="checkbox-item resource-type-venue">
+                                    <input type="checkbox" class="resource-checkbox venue-checkbox" value="${v.id}" id="res_${v.id}" onchange="handleVenueSelection(this)">
+                                    <label for="res_${v.id}">
+                                        <strong>${v.name}</strong><br>
+                                        <small>${v.description || 'Available'}</small>
+                                    </label>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+            }
+
+            if (equipment.length > 0) {
+                html += `
+                    <div class="resource-group">
+                        <h4>🔧 Equipment</h4>
+                        <div class="checkbox-grid">
+                            ${equipment.map(e => `
+                                <div class="checkbox-item resource-type-equipment">
+                                    <input type="checkbox" class="resource-checkbox equipment-checkbox" value="${e.id}" id="res_${e.id}" data-name="${e.name}" data-maxqty="${e.quantity || 1}" onchange="handleEquipmentSelection(this)">
+                                    <label for="res_${e.id}" id="label_${e.id}">
+                                        <strong>${e.name}</strong><br>
+                                        <small>${e.description || 'Available'} (Quantity: ${e.quantity || 1})</small>
+                                    </label>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+            }
+
+            container.innerHTML = html;
+        } catch (error) {
+            console.error('Error loading resources:', error);
+            document.getElementById('resourcesContainer').innerHTML = '<p style="color:var(--danger)">Error loading resources</p>';
+        }
+    }
+
+    // Handle venue selection (no quantity needed)
+    function handleVenueSelection(checkbox) {
+        // Venues don't need quantity selection
+        console.log('Venue selected:', checkbox.value);
+    }
+
+    // Handle equipment selection - show quantity modal
+    function handleEquipmentSelection(checkbox) {
+        const id = checkbox.value;
+        const name = checkbox.getAttribute('data-name');
+        const maxQty = parseInt(checkbox.getAttribute('data-maxqty'));
+
+        if (checkbox.checked) {
+            // Show quantity modal
+            currentEquipmentId = id;
+            currentEquipmentName = name;
+            currentEquipmentMaxQty = maxQty;
+            openQuantityModal();
+        } else {
+            // Remove from quantities
+            delete equipmentQuantities[id];
+            // Reset label
+            const label = document.getElementById(`label_${id}`);
+            const originalText = checkbox.parentElement.querySelector('label').innerHTML.split('<small>')[0];
+            const equipment = allResources.find(r => r.id == id);
+            if (equipment) {
+                label.innerHTML = `<strong>${equipment.name}</strong><br><small>${equipment.description || 'Available'} (Quantity: ${equipment.quantity || 1})</small>`;
+            }
+        }
+    }
+
+    function openQuantityModal() {
+        document.getElementById('quantityResourceName').innerHTML = `<strong>${currentEquipmentName}</strong>`;
+        document.getElementById('availableQuantity').textContent = currentEquipmentMaxQty;
+        document.getElementById('selectedQuantity').value = 1;
+        document.getElementById('selectedQuantity').max = currentEquipmentMaxQty;
+        document.getElementById('quantityError').style.display = 'none';
+        document.getElementById('quantityModal').classList.add('open');
+    }
+
+    function closeQuantityModal() {
+        // If modal closed without confirming, uncheck the checkbox
+        const checkbox = document.querySelector(`.equipment-checkbox[value="${currentEquipmentId}"]`);
+        if (checkbox && checkbox.checked && !equipmentQuantities[currentEquipmentId]) {
+            checkbox.checked = false;
+        }
+        document.getElementById('quantityModal').classList.remove('open');
+    }
+
+    function confirmQuantity() {
+        const quantity = parseInt(document.getElementById('selectedQuantity').value);
+        const maxQuantity = currentEquipmentMaxQty;
+        const errorDiv = document.getElementById('quantityError');
+
+        if (quantity < 1) {
+            errorDiv.textContent = 'Quantity must be at least 1';
+            errorDiv.style.display = 'block';
+            return;
+        }
+
+        if (quantity > maxQuantity) {
+            errorDiv.textContent = `Only ${maxQuantity} units available!`;
+            errorDiv.style.display = 'block';
+            return;
+        }
+
+        // Save quantity
+        equipmentQuantities[currentEquipmentId] = quantity;
+
+        // Update label to show selected quantity
+        const label = document.getElementById(`label_${currentEquipmentId}`);
+        const equipment = allResources.find(r => r.id == currentEquipmentId);
+        if (equipment) {
+            label.innerHTML = `<strong>${equipment.name}</strong><br><small>Quantity: ${quantity} (Max: ${maxQuantity})</small>`;
+        }
+
+        closeQuantityModal();
+    }
+
+    function getSelectedResources() {
+        const checkboxes = document.querySelectorAll('.resource-checkbox:checked');
+        const selectedIds = Array.from(checkboxes).map(cb => cb.value);
+        return selectedIds;
+    }
+
+    document.addEventListener('DOMContentLoaded', async () => {
+        setMinDate('eventDate');
+        await loadResourcesAsCheckboxes();
+    });
+
+    async function submitBooking() {
+        const title    = document.getElementById('title').value.trim();
+        const desc     = document.getElementById('description').value.trim();
+        const orgName  = document.getElementById('organizerName').value.trim();
+        const email    = document.getElementById('contactEmail').value.trim();
+        const date     = document.getElementById('eventDate').value;
+        const start    = document.getElementById('startTime').value;
+        const end      = document.getElementById('endTime').value;
+        const notes    = document.getElementById('notes').value.trim();
+        const imageFile = document.getElementById('eventImage').files[0];
+        const selectedResources = getSelectedResources();
+
+        hideAlerts();
+
+        if (!title)   return showError('Event title is required.');
+        if (!orgName) return showError('Organizer name is required.');
+        if (!email)   return showError('Contact email is required.');
+        if (!date)    return showError('Event date is required.');
+        if (selectedResources.length === 0) return showError('Please select at least one resource.');
+
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) return showError('Please enter a valid email address.');
+
+        const btn = document.getElementById('submitBtn');
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner"></span> Submitting...';
+
+        try {
+            const formData = new FormData();
+            formData.append('title', title);
+            formData.append('description', desc);
+            formData.append('organizerName', orgName);
+            formData.append('contactEmail', email);
+            formData.append('eventDate', date);
+            formData.append('startTime', start || '');
+            formData.append('endTime', end || '');
+            formData.append('notes', notes);
+
+            selectedResources.forEach(resId => {
+                formData.append('resourceIds', resId);
+                // Add quantity for equipment
+                if (equipmentQuantities[resId]) {
+                    formData.append('quantities', `${resId}:${equipmentQuantities[resId]}`);
+                }
+            });
+
+            if (imageFile) {
+                formData.append('eventImage', imageFile);
+            }
+
+            const response = await fetch('/api/events/create', {
+                method: 'POST',
+                body: formData
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                document.getElementById('successMsg').textContent = data.message;
+                document.getElementById('successAlert').classList.add('show');
+                document.getElementById('successAlert').scrollIntoView({ behavior: 'smooth' });
+                showToast('Booking created successfully! 🎉', 'success');
+                resetForm();
+            } else {
+                showError(data.message || 'Failed to create booking');
+            }
+        } catch (err) {
+            console.error('Error:', err);
+            showError(err.message || 'An error occurred');
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '📩 Submit Booking';
+        }
+    }
+
+    function showError(msg) {
+        document.getElementById('errorMsg').textContent = msg;
+        document.getElementById('errorAlert').classList.add('show');
+        document.getElementById('errorAlert').scrollIntoView({ behavior: 'smooth' });
+    }
+
+    function hideAlerts() {
+        document.getElementById('successAlert').classList.remove('show');
+        document.getElementById('errorAlert').classList.remove('show');
+    }
+
+    function resetForm() {
+        ['title','description','organizerName','contactEmail',
+            'eventDate','startTime','endTime','notes'].forEach(id => {
+            document.getElementById(id).value = '';
+        });
+        const checkboxes = document.querySelectorAll('.resource-checkbox');
+        checkboxes.forEach(cb => cb.checked = false);
+        document.getElementById('eventImage').value = '';
+        equipmentQuantities = {};
+        setMinDate('eventDate');
+    }
+</script>
+
+<!-- Import Navbar Script -->
+<div th:replace="navbar :: navbar-script"></div>
+
+</body>
+</html>

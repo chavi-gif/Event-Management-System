@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Manage Users — Admin</title>
+    <link rel="stylesheet" href="/css/style.css"/>
+    <style>
+        .admin-wrapper {
+            display: flex;
+            min-height: calc(100vh - 68px);
+        }
+
+        .admin-sidebar {
+            width: 280px;
+            background: var(--navy);
+            position: fixed;
+            height: calc(100vh - 68px);
+            overflow-y: auto;
+        }
+
+        .admin-content {
+            flex: 1;
+            margin-left: 280px;
+            padding: 2rem;
+            background: var(--off-white);
+        }
+
+        .admin-nav-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 14px 24px;
+            color: rgba(255,255,255,0.7);
+            text-decoration: none;
+            transition: all 0.3s ease;
+            border-left: 3px solid transparent;
+        }
+
+        .admin-nav-item:hover {
+            background: rgba(255,255,255,0.1);
+            color: var(--gold);
+        }
+
+        .admin-nav-item.active {
+            background: rgba(255,255,255,0.1);
+            color: var(--gold);
+            border-left-color: var(--gold);
+        }
+
+        .stats-summary {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .stat-mini {
+            background: white;
+            padding: 1rem;
+            border-radius: var(--radius);
+            text-align: center;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .stat-mini-number {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: var(--navy);
+        }
+
+        .stat-mini-label {
+            font-size: 0.8rem;
+            color: var(--gray-500);
+        }
+
+        .user-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            border-radius: var(--radius-lg);
+            overflow: hidden;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .user-table th {
+            background: var(--navy);
+            color: white;
+            padding: 12px;
+            text-align: left;
+        }
+
+        .user-table td {
+            padding: 10px 12px;
+            border-bottom: 1px solid var(--gray-100);
+        }
+
+        .user-table tr:hover {
+            background: var(--off-white);
+        }
+
+        .badge-admin {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 20px;
+            font-size: 0.7rem;
+            font-weight: 700;
+            background: var(--gold);
+            color: white;
+        }
+
+        .badge-user {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 20px;
+            font-size: 0.7rem;
+            font-weight: 700;
+            background: var(--gray-500);
+            color: white;
+        }
+
+        .search-box {
+            margin-bottom: 1.5rem;
+            display: flex;
+            gap: 1rem;
+        }
+
+        .search-box input {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid var(--gray-300);
+            border-radius: var(--radius);
+            font-size: 0.9rem;
+        }
+
+        @media (max-width: 768px) {
+            .admin-sidebar { display: none; }
+            .admin-content { margin-left: 0; }
+            .stats-summary { grid-template-columns: 1fr; }
+            .user-table { font-size: 0.8rem; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- Navbar -->
+<nav class="navbar">
+    <a href="/" class="nav-brand">
+        <img src="/images/logo2.png" alt="Logo" onerror="this.style.display='none'"/>
+        <div class="nav-brand-text">
+            <div class="title">University of Ruhuna</div>
+            <div class="sub">Faculty of Technology</div>
+        </div>
+    </a>
+    <ul class="nav-links">
+        <li><a href="/">Home</a></li>
+        <li><a href="/index" class="btn-nav-login">Logout</a></li>
+    </ul>
+</nav>
+
+<div class="admin-wrapper">
+    <!-- Sidebar -->
+    <div class="admin-sidebar">
+        <a href="/admin/dashboard" class="admin-nav-item">
+            <span>📊</span> Dashboard
+        </a>
+        <a href="/admin/events" class="admin-nav-item">
+            <span>📅</span> Event Requests
+        </a>
+        <a href="/admin/resources" class="admin-nav-item">
+            <span>🪑</span> Manage Resources
+        </a>
+        <a href="/admin/levels" class="admin-nav-item">
+            <span>📚</span> Manage Level Ranges
+        </a>
+        <a href="/admin/users" class="admin-nav-item active">
+            <span>👥</span> Manage Users
+        </a>
+    </div>
+
+    <!-- Main Content -->
+    <div class="admin-content">
+        <h1 class="section-title">Manage Users</h1>
+        <div class="divider"></div>
+
+        <!-- Statistics Summary -->
+        <div class="stats-summary">
+            <div class="stat-mini">
+                <div class="stat-mini-number" th:text="${users.size()}">0</div>
+                <div class="stat-mini-label">Total Users</div>
+            </div>
+            <div class="stat-mini">
+                <div class="stat-mini-number" th:text="${#lists.size(users.?[level == '1'])}">0</div>
+                <div class="stat-mini-label">Level 1 Students</div>
+            </div>
+            <div class="stat-mini">
+                <div class="stat-mini-number" th:text="${#lists.size(users.?[level == '4'])}">0</div>
+                <div class="stat-mini-label">Level 4 Students</div>
+            </div>
+        </div>
+
+        <!-- Search Box -->
+        <div class="search-box">
+            <input type="text" id="searchInput" placeholder="🔍 Search by name, email, or student ID..." onkeyup="searchUsers()">
+        </div>
+
+        <!-- Users Table -->
+        <div class="table-wrapper">
+            <table class="user-table" id="userTable">
+                <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Name</th>
+                    <th>Email</th>
+                    <th>Student ID</th>
+                    <th>Level</th>
+                    <th>Phone</th>
+                    <th>Actions</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="user : ${users}" th:data-name="${user.firstName + ' ' + user.lastName}" th:data-email="${user.email}" th:data-studentid="${user.studentId}">
+                    <td th:text="${user.id}">1</td>
+                    <td th:text="${user.firstName + ' ' + user.lastName}">John Doe</td>
+                    <td th:text="${user.email}">user@example.com</td>
+                    <td th:text="${user.studentId != null ? user.studentId : '-'}">TG/2024/1234</td>
+                    <td>
+                        <span th:if="${user.level != null}" class="badge-level" th:text="|Level ${user.level}|">Level 1</span>
+                        <span th:if="${user.level == null}">-</span>
+                    </td>
+                    <td th:text="${user.phoneNumber != null ? user.phoneNumber : '-'}">0712345678</td>
+                    <td>
+                        <button class="btn btn-danger btn-sm" th:onclick="|deleteUser(${user.id})|" th:if="${user.email != 'admin@gmail.com'}">🗑️ Delete</button>
+                        <span th:if="${user.email == 'admin@gmail.com'}" style="color: var(--gold); font-size: 0.75rem;">Admin Account</span>
+                    </td>
+                </tr>
+                <tr th:if="${users.isEmpty()}">
+                    <td colspan="7" style="text-align: center; color: var(--gray-500);">No users found</td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Search functionality
+    function searchUsers() {
+        const input = document.getElementById('searchInput');
+        const filter = input.value.toLowerCase();
+        const table = document.getElementById('userTable');
+        const rows = table.getElementsByTagName('tr');
+
+        for (let i = 1; i < rows.length; i++) {
+            const row = rows[i];
+            const name = row.getAttribute('data-name') || '';
+            const email = row.getAttribute('data-email') || '';
+            const studentId = row.getAttribute('data-studentid') || '';
+
+            if (name.toLowerCase().includes(filter) ||
+                email.toLowerCase().includes(filter) ||
+                studentId.toLowerCase().includes(filter)) {
+                row.style.display = '';
+            } else {
+                row.style.display = 'none';
+            }
+        }
+    }
+
+    // Delete User
+    function deleteUser(id) {
+        if (confirm('Are you sure you want to delete this user? This action cannot be undone.')) {
+            fetch(`/admin/user/delete/${id}`, { method: 'DELETE' })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        location.reload();
+                    } else {
+                        alert('Failed to delete user');
+                    }
+                })
+                .catch(error => {
+                    alert('Error deleting user');
+                });
+        }
+    }
+</script>
+
+</body>
+</html>

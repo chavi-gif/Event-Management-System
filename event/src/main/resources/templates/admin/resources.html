@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Manage Resources — Admin</title>
+    <link rel="stylesheet" href="/css/style.css"/>
+    <style>
+        .admin-wrapper {
+            display: flex;
+            min-height: calc(100vh - 68px);
+        }
+
+        .admin-sidebar {
+            width: 280px;
+            background: var(--navy);
+            position: fixed;
+            height: calc(100vh - 68px);
+            overflow-y: auto;
+        }
+
+        .admin-content {
+            flex: 1;
+            margin-left: 280px;
+            padding: 2rem;
+            background: var(--off-white);
+        }
+
+        .admin-nav-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 14px 24px;
+            color: rgba(255,255,255,0.7);
+            text-decoration: none;
+            transition: all 0.3s ease;
+            border-left: 3px solid transparent;
+        }
+
+        .admin-nav-item:hover {
+            background: rgba(255,255,255,0.1);
+            color: var(--gold);
+        }
+
+        .admin-nav-item.active {
+            background: rgba(255,255,255,0.1);
+            color: var(--gold);
+            border-left-color: var(--gold);
+        }
+
+        .resource-card {
+            background: white;
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 0.8rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            border-left: 4px solid var(--gold);
+        }
+
+        .resource-info {
+            flex: 1;
+        }
+
+        .resource-image {
+            width: 60px;
+            height: 60px;
+            border-radius: 8px;
+            object-fit: cover;
+            margin-right: 15px;
+        }
+
+        .resource-name {
+            font-weight: 700;
+            color: var(--navy);
+            font-size: 1rem;
+        }
+
+        .resource-desc {
+            font-size: 0.8rem;
+            color: var(--gray-500);
+            margin-top: 4px;
+        }
+
+        .resource-quantity {
+            font-size: 0.75rem;
+            color: var(--info);
+            margin-top: 4px;
+        }
+
+        .resource-actions {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .availability-toggle {
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.7rem;
+            font-weight: 700;
+            cursor: pointer;
+            border: none;
+            transition: var(--transition);
+        }
+
+        .availability-toggle.available {
+            background: #d1f0e0;
+            color: #155724;
+        }
+
+        .availability-toggle.available:hover {
+            background: #1e5a3a;
+            color: white;
+        }
+
+        .availability-toggle.unavailable {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .availability-toggle.unavailable:hover {
+            background: #c0392b;
+            color: white;
+        }
+
+        .btn-icon {
+            padding: 6px 12px;
+            font-size: 0.8rem;
+        }
+
+        .form-card-small {
+            background: white;
+            border-radius: var(--radius-lg);
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+        }
+
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .modal {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(0.9);
+            background: white;
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-lg);
+            z-index: 10001;
+            width: 90%;
+            max-width: 500px;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.2s ease;
+        }
+
+        .modal.show {
+            transform: translate(-50%, -50%) scale(1);
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .modal-header {
+            background: var(--navy);
+            padding: 1rem 1.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+        }
+
+        .modal-header h3 {
+            color: white;
+            margin: 0;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            color: white;
+            font-size: 1.5rem;
+            cursor: pointer;
+        }
+
+        .modal-body {
+            padding: 1.5rem;
+        }
+
+        .modal-footer {
+            padding: 1rem 1.5rem;
+            border-top: 1px solid var(--gray-100);
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+
+        .image-preview {
+            width: 80px;
+            height: 80px;
+            border-radius: 8px;
+            object-fit: cover;
+            margin-top: 10px;
+            border: 1px solid var(--gray-300);
+        }
+
+        @media (max-width: 768px) {
+            .admin-sidebar { display: none; }
+            .admin-content { margin-left: 0; }
+            .form-row { grid-template-columns: 1fr; }
+            .resource-card { flex-direction: column; gap: 10px; }
+            .resource-actions { justify-content: flex-start; }
+        }
+    </style>
+</head>
+<body>
+
+<nav class="navbar">
+    <a href="/" class="nav-brand">
+        <img src="/images/logo2.png" alt="Logo" onerror="this.style.display='none'"/>
+        <div class="nav-brand-text">
+            <div class="title">University of Ruhuna</div>
+            <div class="sub">Faculty of Technology</div>
+        </div>
+    </a>
+    <ul class="nav-links">
+        <li><a href="/">Home</a></li>
+        <li><a href="/index" class="btn-nav-login">Logout</a></li>
+    </ul>
+</nav>
+
+<div class="admin-wrapper">
+    <div class="admin-sidebar">
+        <a href="/admin/dashboard" class="admin-nav-item">📊 Dashboard</a>
+        <a href="/admin/events" class="admin-nav-item">📅 Event Requests</a>
+        <a href="/admin/resources" class="admin-nav-item active">🪑 Manage Resources</a>
+        <a href="/admin/levels" class="admin-nav-item">📚 Manage Level Ranges</a>
+        <a href="/admin/users" class="admin-nav-item">👥 Manage Users</a>
+    </div>
+
+    <div class="admin-content">
+        <h1 class="section-title">Manage Resources</h1>
+        <div class="divider"></div>
+
+        <!-- Add New Resource Form -->
+        <div class="form-card-small">
+            <h3 style="margin-bottom: 1rem; color: var(--navy);">➕ Add New Resource</h3>
+            <form id="addResourceForm" enctype="multipart/form-data">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Resource Name *</label>
+                        <input type="text" id="resourceName" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Type *</label>
+                        <select id="resourceType" class="form-control" required onchange="toggleQuantityField()">
+                            <option value="">Select Type</option>
+                            <option value="VENUE">Venue</option>
+                            <option value="EQUIPMENT">Equipment</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Description</label>
+                    <input type="text" id="resourceDesc" class="form-control">
+                </div>
+                <!-- Quantity Field (show only for equipment) -->
+                <div class="form-group" id="quantityGroup" style="display: none;">
+                    <label class="form-label">Quantity (Number of units available)</label>
+                    <input type="number" id="resourceQuantity" class="form-control" value="1" min="1">
+                    <div class="form-hint">For equipment only. Venues always have quantity 1.</div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Resource Image</label>
+                    <input type="file" id="resourceImage" class="form-control" accept="image/*">
+                    <img id="imagePreview" class="image-preview" style="display: none;">
+                </div>
+                <button type="submit" class="btn btn-primary">➕ Add Resource</button>
+            </form>
+        </div>
+
+        <!-- Venues Section -->
+        <div class="section-header">
+            <h3 style="color: var(--navy);">🏛️ Venues</h3>
+        </div>
+        <div th:if="${venues.isEmpty()}" style="color: var(--gray-500); padding: 1rem;">No venues available</div>
+        <div th:each="venue : ${venues}" class="resource-card">
+            <img class="resource-image" th:src="${venue.imageUrl != null ? venue.imageUrl : '/images/event-default.jpg'}" alt="Resource Image" onerror="this.src='/images/event-default.jpg'">
+            <div class="resource-info">
+                <div class="resource-name" th:text="${venue.name}">Venue Name</div>
+                <div class="resource-desc" th:text="${venue.description}">Description</div>
+            </div>
+            <div class="resource-actions">
+                <button class="availability-toggle" th:classappend="${venue.available} ? 'available' : 'unavailable'" th:data-id="${venue.id}" th:data-available="${venue.available}" onclick="toggleAvailability(this)" th:text="${venue.available} ? '✓ Available' : '✗ Unavailable'"></button>
+                <button class="btn btn-primary btn-icon" th:data-id="${venue.id}" th:data-name="${venue.name}" th:data-type="${venue.type}" th:data-desc="${venue.description}" th:data-available="${venue.available}" th:data-quantity="${venue.quantity}" onclick="openEditModal(this)">✏️ Edit</button>
+                <button class="btn btn-danger btn-icon" th:data-id="${venue.id}" onclick="deleteResource(this.getAttribute('data-id'))">🗑️ Delete</button>
+            </div>
+        </div>
+
+        <!-- Equipment Section -->
+        <div class="section-header" style="margin-top: 2rem;">
+            <h3 style="color: var(--navy);">🔧 Equipment</h3>
+        </div>
+        <div th:if="${equipment.isEmpty()}" style="color: var(--gray-500); padding: 1rem;">No equipment available</div>
+        <div th:each="item : ${equipment}" class="resource-card">
+            <img class="resource-image" th:src="${item.imageUrl != null ? item.imageUrl : '/images/event-default.jpg'}" alt="Resource Image" onerror="this.src='/images/event-default.jpg'">
+            <div class="resource-info">
+                <div class="resource-name" th:text="${item.name}">Equipment Name</div>
+                <div class="resource-desc" th:text="${item.description}">Description</div>
+                <div class="resource-quantity">📦 Quantity: <span th:text="${item.quantity != null ? item.quantity : 1}">1</span> units</div>
+            </div>
+            <div class="resource-actions">
+                <button class="availability-toggle" th:classappend="${item.available} ? 'available' : 'unavailable'" th:data-id="${item.id}" th:data-available="${item.available}" onclick="toggleAvailability(this)" th:text="${item.available} ? '✓ Available' : '✗ Unavailable'"></button>
+                <button class="btn btn-primary btn-icon" th:data-id="${item.id}" th:data-name="${item.name}" th:data-type="${item.type}" th:data-desc="${item.description}" th:data-available="${item.available}" th:data-quantity="${item.quantity}" onclick="openEditModal(this)">✏️ Edit</button>
+                <button class="btn btn-danger btn-icon" th:data-id="${item.id}" onclick="deleteResource(this.getAttribute('data-id'))">🗑️ Delete</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Modal -->
+<div id="editModal" class="modal">
+    <div class="modal-header">
+        <h3>✏️ Edit Resource</h3>
+        <button class="modal-close" onclick="closeModal()">×</button>
+    </div>
+    <div class="modal-body">
+        <input type="hidden" id="editId">
+        <div class="form-group">
+            <label class="form-label">Resource Name *</label>
+            <input type="text" id="editName" class="form-control">
+        </div>
+        <div class="form-group">
+            <label class="form-label">Type *</label>
+            <select id="editType" class="form-control" onchange="toggleEditQuantityField()">
+                <option value="VENUE">Venue</option>
+                <option value="EQUIPMENT">Equipment</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label class="form-label">Description</label>
+            <input type="text" id="editDesc" class="form-control">
+        </div>
+        <div class="form-group" id="editQuantityGroup" style="display: none;">
+            <label class="form-label">Quantity (Number of units available)</label>
+            <input type="number" id="editQuantity" class="form-control" min="1">
+        </div>
+        <div class="form-group">
+            <label class="form-label">Availability</label>
+            <select id="editAvailable" class="form-control">
+                <option value="true">Available</option>
+                <option value="false">Unavailable</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label class="form-label">Change Image (Optional)</label>
+            <input type="file" id="editImage" class="form-control" accept="image/*">
+            <img id="editImagePreview" class="image-preview" style="display: none;">
+        </div>
+    </div>
+    <div class="modal-footer">
+        <button class="btn btn-outline" onclick="closeModal()">Cancel</button>
+        <button class="btn btn-primary" onclick="saveEdit()">Save Changes</button>
+    </div>
+</div>
+
+<script>
+    // Toggle quantity field based on type selection
+    function toggleQuantityField() {
+        const type = document.getElementById('resourceType').value;
+        const quantityGroup = document.getElementById('quantityGroup');
+        if (type === 'EQUIPMENT') {
+            quantityGroup.style.display = 'block';
+        } else {
+            quantityGroup.style.display = 'none';
+        }
+    }
+
+    function toggleEditQuantityField() {
+        const type = document.getElementById('editType').value;
+        const quantityGroup = document.getElementById('editQuantityGroup');
+        if (type === 'EQUIPMENT') {
+            quantityGroup.style.display = 'block';
+        } else {
+            quantityGroup.style.display = 'none';
+        }
+    }
+
+    // Image preview for add form
+    document.getElementById('resourceImage').addEventListener('change', function(e) {
+        const preview = document.getElementById('imagePreview');
+        if (e.target.files && e.target.files[0]) {
+            const reader = new FileReader();
+            reader.onload = function(ev) {
+                preview.src = ev.target.result;
+                preview.style.display = 'block';
+            };
+            reader.readAsDataURL(e.target.files[0]);
+        }
+    });
+
+    // Add Resource with Image and Quantity
+    document.getElementById('addResourceForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+
+        const formData = new FormData();
+        formData.append('name', document.getElementById('resourceName').value);
+        formData.append('type', document.getElementById('resourceType').value);
+        formData.append('description', document.getElementById('resourceDesc').value);
+
+        // Add quantity if equipment
+        const type = document.getElementById('resourceType').value;
+        if (type === 'EQUIPMENT') {
+            formData.append('quantity', document.getElementById('resourceQuantity').value);
+        }
+
+        const imageFile = document.getElementById('resourceImage').files[0];
+        if (imageFile) {
+            formData.append('image', imageFile);
+        }
+
+        fetch('/admin/resource/add', {
+            method: 'POST',
+            body: formData
+        })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showToast('✅ Resource added successfully!', 'success');
+                    setTimeout(() => location.reload(), 1000);
+                } else {
+                    showToast('❌ Failed to add resource', 'error');
+                }
+            });
+    });
+
+    // Toggle Availability
+    function toggleAvailability(btn) {
+        const id = btn.getAttribute('data-id');
+        const currentAvailable = btn.getAttribute('data-available') === 'true';
+
+        fetch(`/admin/resource/update/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ available: !currentAvailable })
+        })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showToast(currentAvailable ? '❌ Resource marked as Unavailable' : '✅ Resource marked as Available', 'success');
+                    setTimeout(() => location.reload(), 1000);
+                } else {
+                    //showToast('❌ Failed to update availability', 'error');
+                }
+            });
+    }
+
+    // Delete Resource
+    function deleteResource(id) {
+        showConfirmDialog('Delete this resource?', 'Delete', 'Cancel', () => {
+            fetch(`/admin/resource/delete/${id}`, { method: 'DELETE' })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        showToast('🗑️ Resource deleted successfully!', 'success');
+                        setTimeout(() => location.reload(), 1000);
+                    } else {
+                        showToast('❌ Failed to delete resource', 'error');
+                    }
+                });
+        });
+    }
+
+    // Open Edit Modal
+    function openEditModal(btn) {
+        document.getElementById('editId').value = btn.getAttribute('data-id');
+        document.getElementById('editName').value = btn.getAttribute('data-name');
+        document.getElementById('editType').value = btn.getAttribute('data-type');
+        document.getElementById('editDesc').value = btn.getAttribute('data-desc') || '';
+        document.getElementById('editAvailable').value = btn.getAttribute('data-available');
+
+        const quantity = btn.getAttribute('data-quantity');
+        if (quantity && quantity !== 'null') {
+            document.getElementById('editQuantity').value = quantity;
+        } else {
+            document.getElementById('editQuantity').value = 1;
+        }
+
+        // Show/hide quantity field based on type
+        const type = btn.getAttribute('data-type');
+        const editQuantityGroup = document.getElementById('editQuantityGroup');
+        if (type === 'EQUIPMENT') {
+            editQuantityGroup.style.display = 'block';
+        } else {
+            editQuantityGroup.style.display = 'none';
+        }
+
+        document.getElementById('editImagePreview').style.display = 'none';
+        document.getElementById('editImage').value = '';
+        document.getElementById('editModal').classList.add('show');
+    }
+
+    // Save Edit with Image and Quantity
+    function saveEdit() {
+        const id = document.getElementById('editId').value;
+        const formData = new FormData();
+        formData.append('name', document.getElementById('editName').value);
+        formData.append('type', document.getElementById('editType').value);
+        formData.append('description', document.getElementById('editDesc').value);
+        formData.append('available', document.getElementById('editAvailable').value);
+
+        // Add quantity if equipment
+        const type = document.getElementById('editType').value;
+        if (type === 'EQUIPMENT') {
+            formData.append('quantity', document.getElementById('editQuantity').value);
+        }
+
+        const imageFile = document.getElementById('editImage').files[0];
+        if (imageFile) {
+            formData.append('image', imageFile);
+        }
+
+        fetch(`/admin/resource/update/${id}`, {
+            method: 'POST',
+            body: formData
+        })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showToast('✅ Resource updated successfully!', 'success');
+                    closeModal();
+                    setTimeout(() => location.reload(), 1000);
+                } else {
+                    showToast('❌ Failed to update resource', 'error');
+                }
+            });
+    }
+
+    function closeModal() {
+        document.getElementById('editModal').classList.remove('show');
+    }
+
+    // Toast Notification
+    function showToast(message, type) {
+        const toast = document.createElement('div');
+        toast.className = `toast-notification ${type}`;
+        toast.innerHTML = `<div class="toast-content">${message}</div>`;
+        document.body.appendChild(toast);
+        setTimeout(() => toast.classList.add('show'), 10);
+        setTimeout(() => {
+            toast.classList.remove('show');
+            setTimeout(() => toast.remove(), 300);
+        }, 3000);
+    }
+
+    // Confirmation Dialog
+    function showConfirmDialog(message, confirmText, cancelText, onConfirm) {
+        const backdrop = document.createElement('div');
+        backdrop.className = 'modal-backdrop';
+        document.body.appendChild(backdrop);
+        setTimeout(() => backdrop.classList.add('show'), 10);
+
+        const modal = document.createElement('div');
+        modal.className = 'toast-confirm';
+        modal.innerHTML = `
+            <div class="toast-confirm-content">
+                <span class="toast-confirm-message">${message}</span>
+                <div class="toast-confirm-buttons">
+                    <button class="toast-confirm-btn cancel">${cancelText}</button>
+                    <button class="toast-confirm-btn confirm">${confirmText}</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+        setTimeout(() => modal.classList.add('show'), 10);
+
+        const close = () => {
+            modal.classList.remove('show');
+            backdrop.classList.remove('show');
+            setTimeout(() => {
+                modal.remove();
+                backdrop.remove();
+            }, 300);
+        };
+
+        modal.querySelector('.cancel').onclick = close;
+        modal.querySelector('.confirm').onclick = () => {
+            close();
+            onConfirm();
+        };
+    }
+
+    window.onclick = function(e) {
+        const modal = document.getElementById('editModal');
+        if (e.target === modal) {
+            closeModal();
+        }
+    }
+</script>
+
+</body>
+</html>
