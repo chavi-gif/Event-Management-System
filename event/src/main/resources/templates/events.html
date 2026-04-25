@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>All Events — Event Management System</title>
+    <link rel="stylesheet" href="/css/style.css"/>
+    <div th:replace="navbar :: navbar-head"></div>
+    <style>
+        .filters-bar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem;
+            align-items: center;
+            margin-bottom: 2rem;
+            padding: 1rem;
+            background: white;
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-sm);
+        }
+        .search-input {
+            flex: 1;
+            min-width: 200px;
+            padding: 10px 14px;
+            border: 1.5px solid var(--gray-300);
+            border-radius: var(--radius);
+            font-size: 0.9rem;
+        }
+        .filter-select {
+            padding: 10px 14px;
+            border: 1.5px solid var(--gray-300);
+            border-radius: var(--radius);
+            background: white;
+            font-size: 0.9rem;
+            cursor: pointer;
+        }
+        .events-count {
+            margin-left: auto;
+            font-size: 0.85rem;
+            color: var(--gray-500);
+        }
+        .no-results {
+            text-align: center;
+            padding: 3rem;
+            color: var(--gray-500);
+            grid-column: 1/-1;
+        }
+        .btn-edit {
+            background: var(--info);
+            color: white;
+            margin-left: 8px;
+        }
+        .btn-edit:hover {
+            background: #0d5a8a;
+        }
+        /* Edit Modal Styles */
+        .edit-modal {
+            max-width: 550px;
+        }
+        .edit-modal .modal-body {
+            padding: 1.5rem;
+        }
+        .image-preview {
+            width: 100%;
+            max-height: 150px;
+            object-fit: cover;
+            border-radius: 8px;
+            margin-top: 10px;
+            border: 1px solid var(--gray-300);
+        }
+        .verify-email-section {
+            background: #fff3cd;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            border-left: 4px solid var(--warning);
+        }
+        .verify-email-section label {
+            font-weight: 600;
+            color: var(--navy);
+        }
+        .btn-verify {
+            background: var(--gold);
+            color: white;
+            margin-top: 10px;
+            width: 100%;
+        }
+        .btn-verify:hover {
+            background: var(--gold-light);
+        }
+        /* Scrolling fix */
+        html, body {
+            height: auto !important;
+            min-height: 100vh;
+            overflow-y: auto !important;
+        }
+        main {
+            flex: 1;
+            overflow: visible;
+            padding-bottom: 2rem;
+        }
+        .container {
+            overflow: visible;
+            min-height: auto;
+        }
+        .grid-3 {
+            overflow: visible;
+            margin-bottom: 2rem;
+        }
+        footer {
+            margin-top: auto;
+            position: relative;
+            bottom: 0;
+            width: 100%;
+        }
+    </style>
+</head>
+<body style="overflow-y: auto !important; height: auto !important;">
+
+<!-- Import Navbar -->
+<div th:replace="navbar :: navbar"></div>
+
+<!-- ========== PAGE HEADER ========== -->
+<div class="page-header">
+    <div class="container">
+        <div class="breadcrumb">
+            <a href="/">Home</a>
+            <span>›</span>
+            <span>All Events</span>
+        </div>
+        <h1>🎉 All Events</h1>
+        <p>Browse and explore all university events</p>
+    </div>
+</div>
+
+<!-- ========== MAIN CONTENT ========== -->
+<main>
+    <div class="container">
+
+        <!-- Filters Bar (New Booking button REMOVED) -->
+        <div class="filters-bar">
+            <input type="text" id="searchInput" class="search-input"
+                   placeholder="🔍 Search by title, organizer or location..." onkeyup="filterEvents()">
+
+            <select id="statusFilter" class="filter-select" onchange="filterEvents()">
+                <option value="all">📋 All Status</option>
+                <option value="PENDING">⏳ Pending</option>
+                <option value="APPROVED">✅ Approved</option>
+                <option value="CANCELLED">❌ Cancelled</option>
+            </select>
+
+            <select id="sortFilter" class="filter-select" onchange="filterEvents()">
+                <option value="date_asc">📅 Date (Earliest first)</option>
+                <option value="date_desc">📅 Date (Latest first)</option>
+                <option value="title_asc">🔤 Title (A-Z)</option>
+                <option value="title_desc">🔤 Title (Z-A)</option>
+            </select>
+
+            <div class="events-count" id="eventsCount">0 events found</div>
+        </div>
+
+        <!-- Events Grid -->
+        <div class="grid-3" id="eventsGrid">
+            <p style="color:var(--gray-500); grid-column: 1/-1; text-align:center;">Loading events...</p>
+        </div>
+
+    </div>
+</main>
+
+<!-- ========== VIEW MODAL ========== -->
+<div class="modal-overlay" id="viewModal">
+    <div class="modal">
+        <div class="modal-header">
+            <h3>📋 Event Details</h3>
+            <button class="modal-close" onclick="closeModal('viewModal')">×</button>
+        </div>
+        <div class="modal-body" id="viewModalBody"></div>
+        <div class="modal-footer">
+            <button class="btn btn-outline" onclick="closeModal('viewModal')">Close</button>
+        </div>
+    </div>
+</div>
+
+<!-- ========== EDIT MODAL WITH EMAIL VERIFICATION (No Notes Field) ========== -->
+<div class="modal-overlay" id="editModal">
+    <div class="modal edit-modal">
+        <div class="modal-header">
+            <h3>✏️ Edit Event</h3>
+            <button class="modal-close" onclick="closeModal('editModal')">×</button>
+        </div>
+        <div class="modal-body">
+            <input type="hidden" id="editEventId">
+
+            <!-- Step 1: Email Verification Section -->
+            <div id="verifySection">
+                <div class="verify-email-section">
+                    <label>🔐 Verify Your Email</label>
+                    <p style="font-size: 0.8rem; margin-top: 5px;">Please enter the contact email of this event to verify ownership:</p>
+                    <input type="email" id="verifyEmail" class="form-control" placeholder="Enter event contact email" style="margin-top: 8px;">
+                    <div id="verifyError" style="color: var(--danger); font-size: 0.75rem; margin-top: 5px; display: none;"></div>
+                    <button class="btn btn-verify" onclick="verifyAndContinue()">Verify & Continue</button>
+                </div>
+            </div>
+
+            <!-- Step 2: Edit Form (Hidden until verification) - No Notes Field -->
+            <div id="editFormSection" style="display: none;">
+                <div class="form-group">
+                    <label class="form-label">Event Title *</label>
+                    <input type="text" id="editTitle" class="form-control">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Description</label>
+                    <textarea id="editDescription" class="form-control" rows="3"></textarea>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Event Date *</label>
+                        <input type="date" id="editEventDate" class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Resource/Venue *</label>
+                        <select id="editResourceId" class="form-control"></select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Start Time</label>
+                        <input type="time" id="editStartTime" class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">End Time</label>
+                        <input type="time" id="editEndTime" class="form-control">
+                    </div>
+                </div>
+                <!-- Notes Field REMOVED -->
+                <div class="form-group">
+                    <label class="form-label">Change Image (Optional)</label>
+                    <input type="file" id="editImage" class="form-control" accept="image/*">
+                    <img id="editImagePreview" class="image-preview" style="display: none;">
+                </div>
+                <div id="editError" class="alert alert-danger" style="display: none;"></div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-outline" onclick="closeModal('editModal')">Cancel</button>
+            <button class="btn btn-primary" id="saveEditBtn" onclick="saveEventEdit()" style="display: none;">Save Changes</button>
+        </div>
+    </div>
+</div>
+
+<!-- ========== FOOTER ========== -->
+<footer>
+    <p>© 2026 <strong>University of Ruhuna</strong> | Faculty of Technology — Event Management System</p>
+</footer>
+
+<div id="toast"></div>
+<script src="/js/api.js"></script>
+<script>
+    let allEvents = [];
+    let allResources = [];
+    let currentEditingEvent = null;
+
+    // Load resources for edit dropdown
+    async function loadResources() {
+        try {
+            allResources = await apiFetch('/resources');
+            const resourceSelect = document.getElementById('editResourceId');
+            resourceSelect.innerHTML = '<option value="">Select Resource</option>';
+            allResources.forEach(resource => {
+                resourceSelect.innerHTML += `<option value="${resource.id}">${resource.name} (${resource.type})</option>`;
+            });
+        } catch (err) {
+            console.error('Error loading resources:', err);
+        }
+    }
+
+    async function loadEvents() {
+        try {
+            allEvents = await apiFetch('/events');
+            filterEvents();
+        } catch (err) {
+            document.getElementById('eventsGrid').innerHTML = `<p class="no-results">⚠ Could not load events. Make sure backend is running.<br><small>${err.message}</small></p>`;
+        }
+    }
+
+    function filterEvents() {
+        const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+        const status = document.getElementById('statusFilter').value;
+        const sortBy = document.getElementById('sortFilter').value;
+
+        let filtered = [...allEvents];
+
+        if (searchTerm) {
+            filtered = filtered.filter(ev =>
+                ev.title.toLowerCase().includes(searchTerm) ||
+                (ev.organizerName && ev.organizerName.toLowerCase().includes(searchTerm)) ||
+                (ev.resource && ev.resource.name && ev.resource.name.toLowerCase().includes(searchTerm))
+            );
+        }
+
+        if (status !== 'all') {
+            filtered = filtered.filter(ev => ev.status === status);
+        }
+
+        switch(sortBy) {
+            case 'date_asc':
+                filtered.sort((a, b) => new Date(a.eventDate) - new Date(b.eventDate));
+                break;
+            case 'date_desc':
+                filtered.sort((a, b) => new Date(b.eventDate) - new Date(a.eventDate));
+                break;
+            case 'title_asc':
+                filtered.sort((a, b) => a.title.localeCompare(b.title));
+                break;
+            case 'title_desc':
+                filtered.sort((a, b) => b.title.localeCompare(a.title));
+                break;
+        }
+
+        document.getElementById('eventsCount').textContent = `${filtered.length} event(s) found`;
+
+        const grid = document.getElementById('eventsGrid');
+
+        if (filtered.length === 0) {
+            grid.innerHTML = '<p class="no-results">📭 No events found matching your criteria.</p>';
+            return;
+        }
+
+        // Cards with inline CSS to ensure buttons are visible
+        grid.innerHTML = filtered.map((ev, i) => `
+            <div class="card" style="height: auto; min-height: 450px; display: flex; flex-direction: column;">
+                <img class="card-img" src="${ev.imageUrl || '/images/events/default-event.jpg'}" alt="${ev.title}" onerror="this.src='/images/events/default-event.jpg'" style="height: 200px; width: 100%; object-fit: cover;">
+                <div class="card-body" style="padding: 0.8rem 1rem; flex: 1; display: flex; flex-direction: column;">
+                    <div class="card-title">${ev.title}</div>
+                    <div class="card-meta">
+                        <div class="card-meta-item"><span class="icon">📍</span><span>${ev.resource ? ev.resource.name : '—'}</span></div>
+                        <div class="card-meta-item"><span class="icon">📅</span><span>${formatDate(ev.eventDate)}</span></div>
+                        <div class="card-meta-item"><span class="icon">👤</span><span>${ev.organizerName}</span></div>
+                    </div>
+                    ${statusBadge(ev.status)}
+                    <div style="margin-top: auto; display: flex; gap: 8px;">
+                        <button class="btn btn-primary btn-sm" style="flex:1;" onclick="viewEvent(${ev.id})">View Details</button>
+                        <button class="btn btn-info btn-sm btn-edit" style="flex:1;" onclick="openEditModal(${ev.id})">✏️ Edit</button>
+                    </div>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    function viewEvent(id) {
+        const ev = allEvents.find(e => e.id === id);
+        if (!ev) return;
+
+        document.getElementById('viewModalBody').innerHTML = `
+            <div style="margin-bottom:1rem;">
+                <img src="${ev.imageUrl || '/images/events/default-event.jpg'}" style="width:100%; border-radius: 8px; margin-bottom: 1rem;">
+                <p><strong>🎯 Title:</strong> ${ev.title}</p>
+                <p><strong>📝 Description:</strong> ${ev.description || 'No description'}</p>
+                <p><strong>📍 Location:</strong> ${ev.resource ? ev.resource.name : '—'}</p>
+                <p><strong>📅 Date:</strong> ${formatDate(ev.eventDate)}</p>
+                <p><strong>⏰ Time:</strong> ${ev.startTime || '—'} - ${ev.endTime || '—'}</p>
+                <p><strong>👤 Organizer:</strong> ${ev.organizerName}</p>
+                <p><strong>📧 Contact:</strong> <a href="mailto:${ev.contactEmail}">${ev.contactEmail}</a></p>
+                <p><strong>📌 Status:</strong> ${statusBadge(ev.status)}</p>
+                <p><strong>📋 Notes:</strong> ${ev.notes || '—'}</p>
+            </div>
+        `;
+        openModal('viewModal');
+    }
+
+    async function openEditModal(id) {
+        const event = allEvents.find(e => e.id === id);
+        if (!event) return;
+
+        currentEditingEvent = event;
+
+        // Reset modal
+        document.getElementById('verifyEmail').value = '';
+        document.getElementById('verifyError').style.display = 'none';
+        document.getElementById('verifySection').style.display = 'block';
+        document.getElementById('editFormSection').style.display = 'none';
+        document.getElementById('saveEditBtn').style.display = 'none';
+        document.getElementById('editError').style.display = 'none';
+
+        openModal('editModal');
+    }
+
+    async function verifyAndContinue() {
+        const enteredEmail = document.getElementById('verifyEmail').value.trim();
+        const verifyError = document.getElementById('verifyError');
+
+        if (!enteredEmail) {
+            verifyError.textContent = 'Please enter the contact email';
+            verifyError.style.display = 'block';
+            return;
+        }
+
+        if (enteredEmail !== currentEditingEvent.contactEmail) {
+            verifyError.textContent = `❌ Email mismatch! This event belongs to: ${currentEditingEvent.contactEmail}. You cannot edit this event.`;
+            verifyError.style.display = 'block';
+            return;
+        }
+
+        // Email verified - show edit form
+        verifyError.style.display = 'none';
+        document.getElementById('verifySection').style.display = 'none';
+        document.getElementById('editFormSection').style.display = 'block';
+        document.getElementById('saveEditBtn').style.display = 'inline-block';
+
+        await loadResources();
+
+        // Populate form with event data
+        document.getElementById('editEventId').value = currentEditingEvent.id;
+        document.getElementById('editTitle').value = currentEditingEvent.title;
+        document.getElementById('editDescription').value = currentEditingEvent.description || '';
+        document.getElementById('editEventDate').value = currentEditingEvent.eventDate;
+        document.getElementById('editStartTime').value = currentEditingEvent.startTime || '';
+        document.getElementById('editEndTime').value = currentEditingEvent.endTime || '';
+        document.getElementById('editResourceId').value = currentEditingEvent.resource ? currentEditingEvent.resource.id : '';
+        document.getElementById('editImagePreview').style.display = 'none';
+        document.getElementById('editImage').value = '';
+        // Notes field removed
+    }
+
+    async function saveEventEdit() {
+        const id = document.getElementById('editEventId').value;
+        const formData = new FormData();
+        formData.append('title', document.getElementById('editTitle').value);
+        formData.append('description', document.getElementById('editDescription').value);
+        formData.append('eventDate', document.getElementById('editEventDate').value);
+        formData.append('startTime', document.getElementById('editStartTime').value || '');
+        formData.append('endTime', document.getElementById('editEndTime').value || '');
+        formData.append('resourceId', document.getElementById('editResourceId').value);
+        // Notes field removed
+
+        const imageFile = document.getElementById('editImage').files[0];
+        if (imageFile) {
+            formData.append('eventImage', imageFile);
+        }
+
+        const errorDiv = document.getElementById('editError');
+
+        try {
+            const response = await fetch(`/api/events/update/${id}`, {
+                method: 'POST',
+                body: formData
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                showToast('✅ Event updated successfully!', 'success');
+                closeModal('editModal');
+                loadEvents();
+            } else {
+                errorDiv.textContent = data.message || 'Failed to update event';
+                errorDiv.style.display = 'block';
+            }
+        } catch (err) {
+            errorDiv.textContent = err.message || 'An error occurred';
+            errorDiv.style.display = 'block';
+        }
+    }
+
+    // Image preview for edit modal
+    document.getElementById('editImage').addEventListener('change', function(e) {
+        const preview = document.getElementById('editImagePreview');
+        if (e.target.files && e.target.files[0]) {
+            const reader = new FileReader();
+            reader.onload = function(ev) {
+                preview.src = ev.target.result;
+                preview.style.display = 'block';
+            };
+            reader.readAsDataURL(e.target.files[0]);
+        }
+    });
+
+    function openModal(id) {
+        document.getElementById(id).classList.add('open');
+    }
+
+    function closeModal(id) {
+        document.getElementById(id).classList.remove('open');
+        // Reset edit modal state
+        if (id === 'editModal') {
+            document.getElementById('verifySection').style.display = 'block';
+            document.getElementById('editFormSection').style.display = 'none';
+            document.getElementById('saveEditBtn').style.display = 'none';
+            document.getElementById('verifyEmail').value = '';
+        }
+    }
+
+    function showToast(message, type) {
+        const toast = document.createElement('div');
+        toast.className = `toast-notification ${type}`;
+        toast.innerHTML = `<div class="toast-content">${message}</div>`;
+        document.body.appendChild(toast);
+        setTimeout(() => toast.classList.add('show'), 10);
+        setTimeout(() => {
+            toast.classList.remove('show');
+            setTimeout(() => toast.remove(), 300);
+        }, 3000);
+    }
+
+    window.addEventListener('click', e => {
+        if (e.target.classList.contains('modal-overlay')) {
+            e.target.classList.remove('open');
+        }
+    });
+
+    loadEvents();
+</script>
+
+<!-- Import Navbar Script -->
+<div th:replace="navbar :: navbar-script"></div>
+
+</body>
+</html>
