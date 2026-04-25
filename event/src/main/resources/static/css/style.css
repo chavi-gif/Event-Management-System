@@ -1085,7 +1085,6 @@ footer strong { color: var(--gold-light); }
     visibility: hidden;
     transition: opacity 0.2s ease;
 }
-
 .modal-backdrop.show {
     opacity: 1;
     visibility: visible;
