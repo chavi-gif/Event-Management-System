@@ -97,6 +97,82 @@
             color: white;
         }
 
+        /* Modal Styles */
+        .modal {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(0.9);
+            background: white;
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-lg);
+            z-index: 10001;
+            width: 90%;
+            max-width: 500px;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.2s ease;
+        }
+
+        .modal.show {
+            transform: translate(-50%, -50%) scale(1);
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .modal-header {
+            background: var(--navy);
+            padding: 1rem 1.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+        }
+
+        .modal-header h3 {
+            color: white;
+            margin: 0;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            color: white;
+            font-size: 1.5rem;
+            cursor: pointer;
+        }
+
+        .modal-body {
+            padding: 1.5rem;
+        }
+
+        .modal-footer {
+            padding: 1rem 1.5rem;
+            border-top: 1px solid var(--gray-100);
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+
+        /* Modal Backdrop */
+        .modal-backdrop {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 9999;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.2s ease;
+        }
+
+        .modal-backdrop.show {
+            opacity: 1;
+            visibility: visible;
+        }
+
         @media (max-width: 768px) {
             .admin-sidebar { display: none; }
             .admin-content { margin-left: 0; }
@@ -124,21 +200,11 @@
 <div class="admin-wrapper">
     <!-- Sidebar -->
     <div class="admin-sidebar">
-        <a href="/admin/dashboard" class="admin-nav-item">
-            <span>📊</span> Dashboard
-        </a>
-        <a href="/admin/events" class="admin-nav-item">
-            <span>📅</span> Event Requests
-        </a>
-        <a href="/admin/resources" class="admin-nav-item">
-            <span>🪑</span> Manage Resources
-        </a>
-        <a href="/admin/levels" class="admin-nav-item active">
-            <span>📚</span> Manage Level Ranges
-        </a>
-        <a href="/admin/users" class="admin-nav-item">
-            <span>👥</span> Manage Users
-        </a>
+        <a href="/admin/dashboard" class="admin-nav-item">📊 Dashboard</a>
+        <a href="/admin/events" class="admin-nav-item">📅 Event Requests</a>
+        <a href="/admin/resources" class="admin-nav-item">🪑 Manage Resources</a>
+        <a href="/admin/levels" class="admin-nav-item active">📚 Manage Level Ranges</a>
+        <a href="/admin/users" class="admin-nav-item">👥 Manage Users</a>
     </div>
 
     <!-- Main Content -->
@@ -188,7 +254,6 @@
                 <th>Academic Year</th>
                 <th>Student ID Range</th>
                 <th>Actions</th>
-            </tr>
             </thead>
             <tbody>
             <tr th:each="range : ${levelRanges}">
@@ -196,6 +261,7 @@
                 <td th:text="${range.academicYear}">2024</td>
                 <td th:text="|TG/${range.academicYear}/${range.startNumber} - TG/${range.academicYear}/${range.endNumber}|">TG/2024/1903 - TG/2024/2226</td>
                 <td>
+                    <button class="btn btn-primary btn-sm" th:data-id="${range.id}" th:data-level="${range.level}" th:data-year="${range.academicYear}" th:data-start="${range.startNumber}" th:data-end="${range.endNumber}" onclick="openEditModal(this)">✏️ Edit</button>
                     <button class="btn btn-danger btn-sm" th:onclick="|deleteLevel(${range.id})|">🗑️ Delete</button>
                 </td>
             </tr>
@@ -211,7 +277,46 @@
     </div>
 </div>
 
+<!-- Edit Modal -->
+<div id="editModal" class="modal">
+    <div class="modal-header">
+        <h3>✏️ Edit Level Range</h3>
+        <button class="modal-close" onclick="closeModal()">×</button>
+    </div>
+    <div class="modal-body">
+        <input type="hidden" id="editId">
+        <div class="form-group">
+            <label class="form-label">Level *</label>
+            <select id="editLevel" class="form-control" required>
+                <option value="1">Level 1</option>
+                <option value="2">Level 2</option>
+                <option value="3">Level 3</option>
+                <option value="4">Level 4</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label class="form-label">Academic Year *</label>
+            <input type="text" id="editAcademicYear" class="form-control" required>
+        </div>
+        <div class="form-group">
+            <label class="form-label">Start Number *</label>
+            <input type="number" id="editStartNumber" class="form-control" required>
+        </div>
+        <div class="form-group">
+            <label class="form-label">End Number *</label>
+            <input type="number" id="editEndNumber" class="form-control" required>
+        </div>
+        <div id="editError" class="alert alert-danger" style="display: none;"></div>
+    </div>
+    <div class="modal-footer">
+        <button class="btn btn-outline" onclick="closeModal()">Cancel</button>
+        <button class="btn btn-primary" onclick="saveEdit()">Save Changes</button>
+    </div>
+</div>
+
 <script>
+    let activeBackdrop = null;
+
     // Add Level Range
     document.getElementById('addLevelForm').addEventListener('submit', function(e) {
         e.preventDefault();
@@ -231,26 +336,138 @@
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
-                    location.reload();
+                    showToast('✅ Level range added successfully!', 'success');
+                    setTimeout(() => location.reload(), 1000);
                 } else {
-                    alert('Failed to add level range');
+                    showToast('❌ Failed to add level range', 'error');
                 }
             });
     });
 
     // Delete Level Range
     function deleteLevel(id) {
-        if (confirm('Delete this level range? This will affect student registration validation.')) {
+        showConfirmDialog('Delete this level range? This will affect student registration validation.', 'Delete', 'Cancel', () => {
             fetch(`/admin/level/delete/${id}`, { method: 'DELETE' })
                 .then(response => response.json())
                 .then(data => {
                     if (data.success) {
-                        location.reload();
+                        showToast('🗑️ Level range deleted successfully!', 'success');
+                        setTimeout(() => location.reload(), 1000);
                     } else {
-                        alert('Failed to delete level range');
+                        showToast('❌ Failed to delete level range', 'error');
                     }
                 });
+        });
+    }
+
+    // Open Edit Modal
+    function openEditModal(btn) {
+        document.getElementById('editId').value = btn.getAttribute('data-id');
+        document.getElementById('editLevel').value = btn.getAttribute('data-level');
+        document.getElementById('editAcademicYear').value = btn.getAttribute('data-year');
+        document.getElementById('editStartNumber').value = btn.getAttribute('data-start');
+        document.getElementById('editEndNumber').value = btn.getAttribute('data-end');
+        document.getElementById('editError').style.display = 'none';
+        openModal();
+    }
+
+    // Save Edit
+    function saveEdit() {
+        const id = document.getElementById('editId').value;
+        const levelData = {
+            level: document.getElementById('editLevel').value,
+            academicYear: document.getElementById('editAcademicYear').value,
+            startNumber: parseInt(document.getElementById('editStartNumber').value),
+            endNumber: parseInt(document.getElementById('editEndNumber').value)
+        };
+
+        fetch(`/admin/level/update/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(levelData)
+        })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showToast('✅ Level range updated successfully!', 'success');
+                    closeModal();
+                    setTimeout(() => location.reload(), 1000);
+                } else {
+                    document.getElementById('editError').textContent = data.message || 'Failed to update level range';
+                    document.getElementById('editError').style.display = 'block';
+                }
+            });
+    }
+
+    function openModal() {
+        const backdrop = document.createElement('div');
+        backdrop.className = 'modal-backdrop';
+        document.body.appendChild(backdrop);
+        setTimeout(() => backdrop.classList.add('show'), 10);
+        activeBackdrop = backdrop;
+
+        const modal = document.getElementById('editModal');
+        modal.classList.add('show');
+    }
+
+    function closeModal() {
+        const modal = document.getElementById('editModal');
+        modal.classList.remove('show');
+        if (activeBackdrop) {
+            activeBackdrop.classList.remove('show');
+            setTimeout(() => activeBackdrop.remove(), 300);
+            activeBackdrop = null;
         }
+    }
+
+    // Toast Notification
+    function showToast(message, type) {
+        const toast = document.createElement('div');
+        toast.className = `toast-notification ${type}`;
+        toast.innerHTML = `<div class="toast-content">${message}</div>`;
+        document.body.appendChild(toast);
+        setTimeout(() => toast.classList.add('show'), 10);
+        setTimeout(() => {
+            toast.classList.remove('show');
+            setTimeout(() => toast.remove(), 300);
+        }, 3000);
+    }
+
+    // Confirmation Dialog
+    function showConfirmDialog(message, confirmText, cancelText, onConfirm) {
+        const backdrop = document.createElement('div');
+        backdrop.className = 'modal-backdrop';
+        document.body.appendChild(backdrop);
+        setTimeout(() => backdrop.classList.add('show'), 10);
+
+        const modal = document.createElement('div');
+        modal.className = 'toast-confirm';
+        modal.innerHTML = `
+            <div class="toast-confirm-content">
+                <span class="toast-confirm-message">${message}</span>
+                <div class="toast-confirm-buttons">
+                    <button class="toast-confirm-btn cancel">${cancelText}</button>
+                    <button class="toast-confirm-btn confirm">${confirmText}</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+        setTimeout(() => modal.classList.add('show'), 10);
+
+        const close = () => {
+            modal.classList.remove('show');
+            backdrop.classList.remove('show');
+            setTimeout(() => {
+                modal.remove();
+                backdrop.remove();
+            }, 300);
+        };
+
+        modal.querySelector('.cancel').onclick = close;
+        modal.querySelector('.confirm').onclick = () => {
+            close();
+            onConfirm();
+        };
     }
 </script>
 
