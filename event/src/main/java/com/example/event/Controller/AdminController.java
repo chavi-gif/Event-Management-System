@@ -160,8 +160,8 @@ public class AdminController {
         resource.setType(Resource.ResourceType.valueOf(type));
         resource.setDescription(description);
         resource.setAvailable(true);
+        resource.setQuantity(1);
 
-        // Handle image upload to ImgBB cloud
         if (image != null && !image.isEmpty()) {
             try {
                 String imageUrl = imageUploadService.uploadToImgBB(image);
@@ -228,7 +228,6 @@ public class AdminController {
             resource.setDescription(description);
             resource.setAvailable(available);
 
-            // Handle image upload to ImgBB cloud
             if (image != null && !image.isEmpty()) {
                 try {
                     String imageUrl = imageUploadService.uploadToImgBB(image);
@@ -306,6 +305,36 @@ public class AdminController {
             levelRangeRepository.deleteById(id);
             response.put("success", true);
             response.put("message", "Level range deleted");
+        } else {
+            response.put("success", false);
+            response.put("message", "Level range not found");
+        }
+        return ResponseEntity.ok(response);
+    }
+
+    // NEW: Update Level Range
+    @PutMapping("/level/update/{id}")
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> updateLevelRange(@PathVariable Long id,
+                                                                @RequestBody LevelRange levelRange,
+                                                                HttpSession session) {
+        Map<String, Object> response = new HashMap<>();
+        if (!isAdmin(session)) {
+            response.put("success", false);
+            response.put("message", "Unauthorized");
+            return ResponseEntity.status(401).body(response);
+        }
+
+        Optional<LevelRange> existingOpt = levelRangeRepository.findById(id);
+        if (existingOpt.isPresent()) {
+            LevelRange existing = existingOpt.get();
+            existing.setLevel(levelRange.getLevel());
+            existing.setAcademicYear(levelRange.getAcademicYear());
+            existing.setStartNumber(levelRange.getStartNumber());
+            existing.setEndNumber(levelRange.getEndNumber());
+            levelRangeRepository.save(existing);
+            response.put("success", true);
+            response.put("message", "Level range updated successfully");
         } else {
             response.put("success", false);
             response.put("message", "Level range not found");
