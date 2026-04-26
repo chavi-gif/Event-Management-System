@@ -267,6 +267,35 @@
             min-width: 200px;
         }
 
+        .toast-notification {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: white;
+            padding: 12px 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            z-index: 10001;
+            transform: translateX(400px);
+            transition: transform 0.3s ease;
+        }
+
+        .toast-notification.show {
+            transform: translateX(0);
+        }
+
+        .toast-notification.success {
+            border-left: 4px solid #28a745;
+        }
+
+        .toast-notification.error {
+            border-left: 4px solid #dc3545;
+        }
+
+        .toast-notification.warning {
+            border-left: 4px solid #ffc107;
+        }
+
         @media (max-width: 768px) {
             .admin-sidebar { display: none; }
             .admin-content { margin-left: 0; }
@@ -386,6 +415,7 @@
                 <option value="CANCELLED">Cancelled</option>
             </select>
             <button class="btn btn-primary btn-sm" onclick="filterEvents()">Search</button>
+            <button class="btn btn-outline btn-sm" onclick="resetFilters()">Reset</button>
         </div>
 
         <div class="table-wrapper">
@@ -401,6 +431,7 @@
                         <th>Resource</th>
                         <th>Status</th>
                         <th>Actions</th>
+                    </tr>
                     </thead>
                     <tbody id="allEventsTableBody">
                     <tr><td colspan="8" style="text-align:center;padding:2rem;">Loading events...</td></tr>
@@ -411,15 +442,61 @@
     </div>
 </div>
 
+<!-- Toast Container -->
+<div id="toast"></div>
+
 <script>
     let activeBackdrop = null;
     let allEvents = [];
 
+    // Helper function to escape HTML
+    function escapeHtml(str) {
+        if (!str) return '';
+        return str.replace(/[&<>]/g, function(m) {
+            if (m === '&') return '&amp;';
+            if (m === '<') return '&lt;';
+            if (m === '>') return '&gt;';
+            return m;
+        });
+    }
+
+    // Format date function
+    function formatDate(dateStr) {
+        if (!dateStr) return '-';
+        try {
+            const d = new Date(dateStr);
+            if (isNaN(d.getTime())) return dateStr;
+            return d.toLocaleDateString('en-GB');
+        } catch (e) {
+            return dateStr;
+        }
+    }
+
+    // Get status badge HTML
+    function getStatusBadge(status) {
+        switch(status) {
+            case 'PENDING': return '<span class="badge-pending">⏳ Pending</span>';
+            case 'APPROVED': return '<span class="badge-approved">✅ Approved</span>';
+            case 'CANCELLED': return '<span class="badge-cancelled">❌ Cancelled</span>';
+            default: return status;
+        }
+    }
+
     // Show custom toast notification
     function showToast(message, type) {
+        // Try to use the global toast element first
+        const toastEl = document.getElementById('toast');
+        if (toastEl) {
+            toastEl.textContent = message;
+            toastEl.className = `show ${type}`;
+            setTimeout(() => { toastEl.className = ''; }, 3500);
+            return;
+        }
+
+        // Fallback toast
         const toast = document.createElement('div');
         toast.className = `toast-notification ${type}`;
-        toast.innerHTML = `<div class="toast-content">${message}</div>`;
+        toast.innerHTML = `<div class="toast-content">${escapeHtml(message)}</div>`;
         document.body.appendChild(toast);
         setTimeout(() => toast.classList.add('show'), 10);
         setTimeout(() => {
@@ -444,10 +521,10 @@
         modal.className = 'toast-confirm';
         modal.innerHTML = `
             <div class="toast-confirm-content">
-                <span class="toast-confirm-message">${message}</span>
+                <span class="toast-confirm-message">${escapeHtml(message)}</span>
                 <div class="toast-confirm-buttons">
-                    <button class="toast-confirm-btn cancel">${cancelText}</button>
-                    <button class="toast-confirm-btn confirm">${confirmText}</button>
+                    <button class="toast-confirm-btn cancel">${escapeHtml(cancelText)}</button>
+                    <button class="toast-confirm-btn confirm">${escapeHtml(confirmText)}</button>
                 </div>
             </div>
         `;
@@ -464,14 +541,24 @@
             }, 300);
         };
 
-        modal.querySelector('.cancel').onclick = closeDialog;
-        modal.querySelector('.confirm').onclick = () => {
-            closeDialog();
-            onConfirm();
-        };
+        const cancelBtn = modal.querySelector('.cancel');
+        const confirmBtn = modal.querySelector('.confirm');
+
+        if (cancelBtn) cancelBtn.onclick = closeDialog;
+        if (confirmBtn) {
+            confirmBtn.onclick = () => {
+                closeDialog();
+                if (onConfirm) onConfirm();
+            };
+        }
     }
 
     function approveEvent(id, title) {
+        if (!id) {
+            showToast('❌ Invalid event ID', 'error');
+            return;
+        }
+
         showConfirmDialog(`✅ Approve "${title}"?`, 'Approve', 'Cancel', () => {
             fetch(`/admin/event/approve/${id}`, { method: 'POST' })
                 .then(response => response.json())
@@ -480,13 +567,22 @@
                         showToast('✅ Event approved successfully!', 'success');
                         setTimeout(() => location.reload(), 1500);
                     } else {
-                        showToast('❌ Failed to approve event', 'error');
+                        showToast('❌ Failed to approve event: ' + (data.message || 'Unknown error'), 'error');
                     }
+                })
+                .catch(error => {
+                    console.error('Error approving event:', error);
+                    showToast('❌ Error approving event', 'error');
                 });
         });
     }
 
     function rejectEvent(id, title) {
+        if (!id) {
+            showToast('❌ Invalid event ID', 'error');
+            return;
+        }
+
         showConfirmDialog(`❌ Reject "${title}"?`, 'Reject', 'Cancel', () => {
             fetch(`/admin/event/reject/${id}`, { method: 'POST' })
                 .then(response => response.json())
@@ -495,8 +591,12 @@
                         showToast('❌ Event rejected', 'warning');
                         setTimeout(() => location.reload(), 1500);
                     } else {
-                        showToast('❌ Failed to reject event', 'error');
+                        showToast('❌ Failed to reject event: ' + (data.message || 'Unknown error'), 'error');
                     }
+                })
+                .catch(error => {
+                    console.error('Error rejecting event:', error);
+                    showToast('❌ Error rejecting event', 'error');
                 });
         });
     }
@@ -505,11 +605,20 @@
     async function loadAllEvents() {
         try {
             const response = await fetch('/api/events');
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
             allEvents = await response.json();
             filterEvents();
         } catch (error) {
             console.error('Error loading events:', error);
-            document.getElementById('allEventsTableBody').innerHTML = '<tr><td colspan="8" style="text-align:center;color:red;">Failed to load events</td></tr>';
+            const tbody = document.getElementById('allEventsTableBody');
+            if (tbody) {
+                tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;color:red;padding:2rem;">
+                    ❌ Failed to load events: ${escapeHtml(error.message)}<br>
+                    <small>Make sure backend is running at localhost:8080</small>
+                </td></tr>`;
+            }
         }
     }
 
@@ -521,7 +630,7 @@
 
         if (searchTerm) {
             filtered = filtered.filter(event =>
-                event.title.toLowerCase().includes(searchTerm) ||
+                (event.title && event.title.toLowerCase().includes(searchTerm)) ||
                 (event.organizerName && event.organizerName.toLowerCase().includes(searchTerm)) ||
                 (event.contactEmail && event.contactEmail.toLowerCase().includes(searchTerm))
             );
@@ -531,9 +640,14 @@
             filtered = filtered.filter(event => event.status === statusFilter);
         }
 
-        document.getElementById('allEventsCount').textContent = `${filtered.length} events`;
+        const countSpan = document.getElementById('allEventsCount');
+        if (countSpan) {
+            countSpan.textContent = `${filtered.length} events`;
+        }
 
         const tbody = document.getElementById('allEventsTableBody');
+
+        if (!tbody) return;
 
         if (filtered.length === 0) {
             tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:2rem;">No events found</td></tr>';
@@ -545,62 +659,68 @@
                 <td>${event.id}</td>
                 <td><strong>${escapeHtml(event.title)}</strong></td>
                 <td>${formatDate(event.eventDate)}</td>
-                <td>${escapeHtml(event.organizerName)}</td>
-                <td>${escapeHtml(event.contactEmail)}</td>
-                <td>${event.resource ? event.resource.name : '-'}</td>
+                <td>${escapeHtml(event.organizerName || '-')}</td>
+                <td>${escapeHtml(event.contactEmail || '-')}</td>
+                <td>${event.resource ? escapeHtml(event.resource.name) : '-'}</td>
                 <td>${getStatusBadge(event.status)}</td>
                 <td>
-                    <button class="btn btn-sm btn-danger" onclick="deleteEvent(${event.id}, '${escapeHtml(event.title)}')">🗑️ Delete</button>
+                    <button class="btn btn-sm btn-danger" onclick="deleteEvent(${event.id}, '${escapeHtml(event.title).replace(/'/g, "\\'")}')">🗑️ Delete</button>
                 </td>
             </tr>
         `).join('');
     }
 
-    function getStatusBadge(status) {
-        switch(status) {
-            case 'PENDING': return '<span class="badge-pending">⏳ Pending</span>';
-            case 'APPROVED': return '<span class="badge-approved">✅ Approved</span>';
-            case 'CANCELLED': return '<span class="badge-cancelled">❌ Cancelled</span>';
-            default: return status;
-        }
-    }
+    function resetFilters() {
+        const searchInput = document.getElementById('searchInput');
+        const statusFilter = document.getElementById('statusFilter');
 
-    function formatDate(dateStr) {
-        if (!dateStr) return '-';
-        const d = new Date(dateStr);
-        return d.toLocaleDateString('en-GB');
-    }
+        if (searchInput) searchInput.value = '';
+        if (statusFilter) statusFilter.value = 'all';
 
-    function escapeHtml(str) {
-        if (!str) return '';
-        return str.replace(/[&<>]/g, function(m) {
-            if (m === '&') return '&amp;';
-            if (m === '<') return '&lt;';
-            if (m === '>') return '&gt;';
-            return m;
-        });
+        filterEvents();
     }
 
     function deleteEvent(id, title) {
-        showConfirmDialog(`🗑️ Delete "${title}"?`, 'Delete', 'Cancel', () => {
+        if (!id) {
+            showToast('❌ Invalid event ID', 'error');
+            return;
+        }
+
+        showConfirmDialog(`🗑️ Delete "${title}"? This action cannot be undone.`, 'Delete', 'Cancel', () => {
             fetch(`/api/events/${id}`, { method: 'DELETE' })
                 .then(response => {
                     if (response.ok) {
                         showToast('✅ Event deleted successfully!', 'success');
+                        // Reload the events list without refreshing the page
                         loadAllEvents();
-                        setTimeout(() => location.reload(), 1500);
                     } else {
-                        showToast('❌ Failed to delete event', 'error');
+                        return response.json().then(data => {
+                            throw new Error(data.message || 'Failed to delete event');
+                        });
                     }
                 })
-                .catch(() => {
-                    showToast('❌ Failed to delete event', 'error');
+                .catch(error => {
+                    console.error('Error deleting event:', error);
+                    showToast('❌ ' + error.message, 'error');
                 });
         });
     }
 
+    // Add event listener for Enter key on search input
+    const searchInput = document.getElementById('searchInput');
+    if (searchInput) {
+        searchInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                filterEvents();
+            }
+        });
+    }
+
     // Load all events when page loads
-    loadAllEvents();
+    document.addEventListener('DOMContentLoaded', function() {
+        loadAllEvents();
+        console.log('✅ Admin events page initialized');
+    });
 </script>
 
 </body>
