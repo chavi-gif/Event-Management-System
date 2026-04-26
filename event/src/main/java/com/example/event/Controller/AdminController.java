@@ -139,12 +139,14 @@ public class AdminController {
         return "admin/resources";
     }
 
+    // FIXED: Added quantity parameter
     @PostMapping("/resource/add")
     @ResponseBody
     public ResponseEntity<Map<String, Object>> addResource(
             @RequestParam("name") String name,
             @RequestParam("type") String type,
             @RequestParam(value = "description", required = false) String description,
+            @RequestParam(value = "quantity", required = false, defaultValue = "1") Integer quantity,  // ← ADDED THIS
             @RequestParam(value = "image", required = false) MultipartFile image,
             HttpSession session) {
 
@@ -160,7 +162,13 @@ public class AdminController {
         resource.setType(Resource.ResourceType.valueOf(type));
         resource.setDescription(description);
         resource.setAvailable(true);
-        resource.setQuantity(1);
+
+        // FIXED: Use the quantity from request instead of hardcoding to 1
+        if (type.equals("EQUIPMENT")) {
+            resource.setQuantity(quantity);  // Use the quantity from frontend
+        } else {
+            resource.setQuantity(1);  // Venues always have quantity 1
+        }
 
         if (image != null && !image.isEmpty()) {
             try {
@@ -202,6 +210,7 @@ public class AdminController {
         return ResponseEntity.ok(response);
     }
 
+    // FIXED: Added quantity parameter
     @PostMapping("/resource/update/{id}")
     @ResponseBody
     public ResponseEntity<Map<String, Object>> updateResourceWithImage(
@@ -210,6 +219,7 @@ public class AdminController {
             @RequestParam("type") String type,
             @RequestParam(value = "description", required = false) String description,
             @RequestParam("available") boolean available,
+            @RequestParam(value = "quantity", required = false, defaultValue = "1") Integer quantity,  // ← ADDED THIS
             @RequestParam(value = "image", required = false) MultipartFile image,
             HttpSession session) {
 
@@ -227,6 +237,13 @@ public class AdminController {
             resource.setType(Resource.ResourceType.valueOf(type));
             resource.setDescription(description);
             resource.setAvailable(available);
+
+            // FIXED: Update quantity based on type
+            if (type.equals("EQUIPMENT")) {
+                resource.setQuantity(quantity);  // Use the quantity from frontend
+            } else {
+                resource.setQuantity(1);  // Venues always have quantity 1
+            }
 
             if (image != null && !image.isEmpty()) {
                 try {
