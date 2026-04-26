@@ -549,14 +549,27 @@
             e.preventDefault();
 
             const formData = new FormData();
-            formData.append('name', document.getElementById('resourceName').value);
-            formData.append('type', document.getElementById('resourceType').value);
-            formData.append('description', document.getElementById('resourceDesc').value);
+            const resourceName = document.getElementById('resourceName').value;
+            const resourceType = document.getElementById('resourceType').value;
+            const resourceDesc = document.getElementById('resourceDesc').value;
+
+            formData.append('name', resourceName);
+            formData.append('type', resourceType);
+            formData.append('description', resourceDesc);
 
             // Add quantity if equipment
-            const type = document.getElementById('resourceType').value;
-            if (type === 'EQUIPMENT') {
-                formData.append('quantity', document.getElementById('resourceQuantity').value);
+            if (resourceType === 'EQUIPMENT') {
+                const quantityInput = document.getElementById('resourceQuantity');
+                let quantityValue = 1;
+                if (quantityInput && quantityInput.value) {
+                    quantityValue = parseInt(quantityInput.value);
+                    if (isNaN(quantityValue) || quantityValue < 1) {
+                        quantityValue = 1;
+                    }
+                }
+                formData.append('quantity', quantityValue.toString());
+            } else {
+                formData.append('quantity', '1');
             }
 
             const imageFile = document.getElementById('resourceImage').files[0];
@@ -654,10 +667,12 @@
         document.getElementById('editDesc').value = desc;
         document.getElementById('editAvailable').value = available || 'true';
 
-        if (quantity && quantity !== 'null') {
-            document.getElementById('editQuantity').value = quantity;
+        // Fix: Properly set quantity value
+        const quantityField = document.getElementById('editQuantity');
+        if (quantity && quantity !== 'null' && quantity !== 'undefined') {
+            quantityField.value = parseInt(quantity);
         } else {
-            document.getElementById('editQuantity').value = 1;
+            quantityField.value = 1;
         }
 
         // Show/hide quantity field based on type
@@ -682,15 +697,29 @@
         }
 
         const formData = new FormData();
-        formData.append('name', document.getElementById('editName').value);
-        formData.append('type', document.getElementById('editType').value);
-        formData.append('description', document.getElementById('editDesc').value);
-        formData.append('available', document.getElementById('editAvailable').value);
+        const editName = document.getElementById('editName').value;
+        const editType = document.getElementById('editType').value;
+        const editDesc = document.getElementById('editDesc').value;
+        const editAvailable = document.getElementById('editAvailable').value;
+
+        formData.append('name', editName);
+        formData.append('type', editType);
+        formData.append('description', editDesc);
+        formData.append('available', editAvailable);
 
         // Add quantity if equipment
-        const type = document.getElementById('editType').value;
-        if (type === 'EQUIPMENT') {
-            formData.append('quantity', document.getElementById('editQuantity').value);
+        if (editType === 'EQUIPMENT') {
+            const quantityInput = document.getElementById('editQuantity');
+            let quantityValue = 1;
+            if (quantityInput && quantityInput.value) {
+                quantityValue = parseInt(quantityInput.value);
+                if (isNaN(quantityValue) || quantityValue < 1) {
+                    quantityValue = 1;
+                }
+            }
+            formData.append('quantity', quantityValue.toString());
+        } else {
+            formData.append('quantity', '1');
         }
 
         const imageFile = document.getElementById('editImage').files[0];
