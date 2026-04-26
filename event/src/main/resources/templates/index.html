@@ -6,11 +6,63 @@
     <title>Event Management System — University of Ruhuna, FoT</title>
     <link rel="stylesheet" href="/css/style.css"/>
     <div th:replace="navbar :: navbar-head"></div>
+    <style>
+        /* Login Required Modal Styles */
+        .login-modal {
+            max-width: 400px;
+        }
+        .login-modal .modal-body {
+            text-align: center;
+            padding: 2rem;
+        }
+        .login-modal .modal-body p {
+            margin-bottom: 0;
+        }
+        .toast-notification {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: white;
+            padding: 12px 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            z-index: 10000;
+            transform: translateX(400px);
+            transition: transform 0.3s ease;
+        }
+        .toast-notification.show {
+            transform: translateX(0);
+        }
+        .toast-notification.success {
+            border-left: 4px solid #28a745;
+        }
+        .toast-notification.error {
+            border-left: 4px solid #dc3545;
+        }
+    </style>
 </head>
 <body>
 
 <!-- Import Navbar -->
 <div th:replace="navbar :: navbar"></div>
+
+<!-- ========== LOGIN REQUIRED MODAL ========== -->
+<div class="modal-overlay" id="loginModal">
+    <div class="modal login-modal">
+        <div class="modal-header">
+            <h3>🔒 Login Required</h3>
+            <button class="modal-close" onclick="closeLoginModal()">×</button>
+        </div>
+        <div class="modal-body">
+            <div style="font-size: 3rem; margin-bottom: 1rem;">🔐</div>
+            <p>Please login to access this feature.</p>
+        </div>
+        <div class="modal-footer" style="justify-content: center;">
+            <button class="btn btn-outline" onclick="closeLoginModal()">Cancel</button>
+            <a href="/login" class="btn btn-gold">Login Now</a>
+        </div>
+    </div>
+</div>
 
 <!-- ========== HERO ========== -->
 <section class="hero">
@@ -56,7 +108,7 @@
             <p style="color:var(--gray-500)">Loading events...</p>
         </div>
         <div style="text-align:center;margin-top:2rem;">
-            <a href="/login" class="btn btn-outline">View All Events →</a>
+            <a href="#" id="viewAllEventsBtn" class="btn btn-outline protected-link" data-href="/events">View All Events →</a>
         </div>
     </div>
 </section>
@@ -67,10 +119,9 @@
         <h2>📢 Notices</h2>
         <ul class="notice-list">
             <li>All event bookings must be made at least 3 days in advance.</li>
-            <li>All students must carry their university ID when attending events.</li>
             <li>Resource availability is subject to approval by the Faculty administration.</li>
             <li>Double booking of the same venue on the same date is not permitted.</li>
-            <li>New events are updated weekly on this portal.</li>
+            <li>New events are updated on this portal.</li>
         </ul>
     </div>
 </section>
@@ -81,47 +132,236 @@
 </footer>
 
 <div id="toast"></div>
-<script src="/js/api.js"></script>
+
+<!-- ========== FIXED API FUNCTIONS - EMBEDDED DIRECTLY ========== -->
 <script>
-    async function loadHomepage() {
+    // API Configuration - Embedded to ensure it works
+    const API_BASE = 'http://localhost:8080/api';
+    let currentUser = null;
+
+    async function apiFetch(url, options = {}) {
+        console.log(`📡 API Call: ${API_BASE + url}`);
         try {
-            const [upcoming, resources] = await Promise.all([apiFetch('/events/upcoming'), apiFetch('/resources')]);
-            const allEvents = await apiFetch('/events');
-            const venues = resources.filter(r => r.type === 'VENUE' && r.available);
-            const equipment = resources.filter(r => r.type === 'EQUIPMENT');
-
-            document.getElementById('statTotal').textContent = allEvents.length;
-            document.getElementById('statUpcoming').textContent = upcoming.length;
-            document.getElementById('statVenues').textContent = venues.length;
-            document.getElementById('statEquipment').textContent = equipment.length;
-
-            const grid = document.getElementById('eventsGrid');
-            // Show only first 4 upcoming events
-            const shown = upcoming.slice(0, 6);
-            if (shown.length === 0) {
-                grid.innerHTML = '<p>No upcoming events found.</p>';
-                return;
+            const res = await fetch(API_BASE + url, {
+                headers: { 'Content-Type': 'application/json', ...options.headers },
+                ...options
+            });
+            const data = await res.json();
+            if (!res.ok) {
+                const msg = data.message || data.error || 'An error occurred';
+                throw new Error(msg);
             }
-
-            grid.innerHTML = shown.map((ev, i) => `
-                <div class="card">
-                    <img class="card-img" src="${ev.imageUrl || '/images/events/default-event.jpg'}" alt="${ev.title}" onerror="this.src='/images/events/default-event.jpg'">
-                    <div class="card-body">
-                        <div class="card-title">${ev.title}</div>
-                        <div class="card-meta">
-                            <div class="card-meta-item"><span class="icon">📍</span><span>${ev.resource ? ev.resource.name : '—'}</span></div>
-                            <div class="card-meta-item"><span class="icon">📅</span><span>${formatDate(ev.eventDate)}</span></div>
-                            <div class="card-meta-item"><span class="icon">👤</span><span>${ev.organizerName}</span></div>
-                        </div>
-                    </div>
-                </div>
-            `).join('');
+            return data;
         } catch (err) {
-            document.getElementById('eventsGrid').innerHTML = `<p>⚠ Could not load events. Make sure backend is running at localhost:8080.<br><small>${err.message}</small></p>`;
+            console.error('API Fetch Error:', err);
+            throw err;
         }
     }
 
-    loadHomepage();
+    function formatDate(dateStr) {
+        if (!dateStr) return '—';
+        try {
+            const d = new Date(dateStr + 'T00:00:00');
+            return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+        } catch (e) {
+            return dateStr;
+        }
+    }
+
+    function showToast(message, type = 'success') {
+        const toastEl = document.getElementById('toast');
+        if (toastEl) {
+            toastEl.textContent = message;
+            toastEl.className = `show ${type}`;
+            setTimeout(() => { toastEl.className = ''; }, 3500);
+            return;
+        }
+
+        const toast = document.createElement('div');
+        toast.className = `toast-notification ${type}`;
+        toast.innerHTML = `<div class="toast-content">${escapeHtml(message)}</div>`;
+        document.body.appendChild(toast);
+        setTimeout(() => toast.classList.add('show'), 10);
+        setTimeout(() => {
+            toast.classList.remove('show');
+            setTimeout(() => toast.remove(), 300);
+        }, 3000);
+    }
+
+    function escapeHtml(text) {
+        if (!text) return '';
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    console.log('✅ API functions initialized for index.html');
+</script>
+
+<!-- Try to load external api.js as fallback -->
+<script src="/js/api.js" onerror="console.warn('⚠️ External api.js not found, using embedded version')"></script>
+
+<script>
+    // Check if user is logged in
+    function isLoggedIn() {
+        return currentUser !== null;
+    }
+
+    // Get current user from session
+    async function loadCurrentUser() {
+        try {
+            const response = await fetch('/api/current-user');
+            if (response.ok) {
+                currentUser = await response.json();
+                console.log('User logged in:', currentUser.email);
+            } else {
+                console.log('User not logged in');
+            }
+        } catch (err) {
+            console.log('User not logged in');
+        }
+    }
+
+    // Open login modal
+    function openLoginModal() {
+        const modal = document.getElementById('loginModal');
+        if (modal) {
+            modal.classList.add('open');
+        }
+    }
+
+    // Close login modal
+    function closeLoginModal() {
+        const modal = document.getElementById('loginModal');
+        if (modal) {
+            modal.classList.remove('open');
+        }
+    }
+
+    // Handle protected link clicks
+    function handleProtectedLink(event, targetUrl) {
+        event.preventDefault();
+        if (isLoggedIn()) {
+            window.location.href = targetUrl;
+        } else {
+            openLoginModal();
+        }
+    }
+
+    async function loadHomepage() {
+        try {
+            console.log('Loading homepage data...');
+
+            // Fetch all required data in parallel
+            const [upcoming, resources, allEvents] = await Promise.all([
+                apiFetch('/events/upcoming'),
+                apiFetch('/resources'),
+                apiFetch('/events')
+            ]);
+
+            console.log('Data loaded:', {
+                upcomingCount: upcoming?.length || 0,
+                resourcesCount: resources?.length || 0,
+                eventsCount: allEvents?.length || 0
+            });
+
+            // Calculate statistics
+            const venues = resources?.filter(r => r.type === 'VENUE' && r.available) || [];
+            const equipment = resources?.filter(r => r.type === 'EQUIPMENT') || [];
+
+            // Update stats display with null checks
+            const statTotal = document.getElementById('statTotal');
+            const statUpcoming = document.getElementById('statUpcoming');
+            const statVenues = document.getElementById('statVenues');
+            const statEquipment = document.getElementById('statEquipment');
+
+            if (statTotal) statTotal.textContent = allEvents?.length || 0;
+            if (statUpcoming) statUpcoming.textContent = upcoming?.length || 0;
+            if (statVenues) statVenues.textContent = venues.length || 0;
+            if (statEquipment) statEquipment.textContent = equipment.length || 0;
+
+            // Display upcoming events
+            const grid = document.getElementById('eventsGrid');
+            const shown = upcoming?.slice(0, 6) || [];
+
+            if (shown.length === 0) {
+                if (grid) {
+                    grid.innerHTML = '<p style="color:var(--gray-500); text-align:center;">✨ No upcoming events found. Check back later!</p>';
+                }
+                return;
+            }
+
+            // Render event cards with escapeHtml for safety
+            if (grid) {
+                grid.innerHTML = shown.map(ev => `
+                    <div class="card">
+                        <img class="card-img" src="${ev.imageUrl || '/images/events/default-event.jpg'}" alt="${escapeHtml(ev.title)}" onerror="this.src='/images/events/default-event.jpg'">
+                        <div class="card-body">
+                            <div class="card-title">${escapeHtml(ev.title)}</div>
+                            <div class="card-meta">
+                                <div class="card-meta-item"><span class="icon">📍</span><span>${ev.resource ? escapeHtml(ev.resource.name) : '—'}</span></div>
+                                <div class="card-meta-item"><span class="icon">📅</span><span>${formatDate(ev.eventDate)}</span></div>
+                                <div class="card-meta-item"><span class="icon">👤</span><span>${escapeHtml(ev.organizerName || 'Staff')}</span></div>
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+            }
+
+            console.log('✅ Homepage loaded successfully');
+
+        } catch (err) {
+            console.error('Error loading homepage:', err);
+            const grid = document.getElementById('eventsGrid');
+            if (grid) {
+                grid.innerHTML = `
+                    <div style="grid-column:1/-1; text-align:center; padding:2rem;">
+                        <p style="color:var(--danger);">⚠️ Could not load events. Make sure backend is running at localhost:8080.</p>
+                        <p style="color:var(--gray-500); font-size:0.9rem; margin-top:0.5rem;">Error details: ${escapeHtml(err.message)}</p>
+                        <button onclick="location.reload()" style="margin-top:1rem; padding:0.5rem 1rem; background:var(--primary); color:white; border:none; border-radius:6px; cursor:pointer;">Retry</button>
+                    </div>
+                `;
+            }
+        }
+    }
+
+    // Set up protected link
+    function setupProtectedLinks() {
+        const protectedLinks = document.querySelectorAll('.protected-link');
+        protectedLinks.forEach(link => {
+            link.addEventListener('click', function(e) {
+                e.preventDefault();
+                const targetUrl = this.getAttribute('data-href');
+                if (isLoggedIn()) {
+                    window.location.href = targetUrl;
+                } else {
+                    openLoginModal();
+                }
+            });
+        });
+    }
+
+    // Close modal when clicking outside
+    window.addEventListener('click', function(e) {
+        const modal = document.getElementById('loginModal');
+        if (e.target === modal) {
+            closeLoginModal();
+        }
+    });
+
+    // Initialize
+    async function init() {
+        await loadCurrentUser();
+        await loadHomepage();
+        setupProtectedLinks();
+    }
+
+    // Start initialization when DOM is ready
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+    } else {
+        init();
+    }
 </script>
 
 <!-- Import Navbar Script -->
