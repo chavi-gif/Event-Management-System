@@ -66,6 +66,59 @@
             color: var(--info);
             font-weight: 600;
         }
+        .alert {
+            display: none;
+            padding: 1rem;
+            border-radius: var(--radius);
+            margin-bottom: 1rem;
+        }
+        .alert.show {
+            display: block;
+        }
+        .alert-success {
+            background: #d1f0e0;
+            color: #155724;
+            border-left: 4px solid #28a745;
+        }
+        .alert-danger {
+            background: #f8d7da;
+            color: #721c24;
+            border-left: 4px solid #dc3545;
+        }
+        .spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 0.6s linear infinite;
+            margin-right: 8px;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        .toast-notification {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: white;
+            padding: 12px 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            z-index: 10000;
+            transform: translateX(400px);
+            transition: transform 0.3s ease;
+        }
+        .toast-notification.show {
+            transform: translateX(0);
+        }
+        .toast-notification.success {
+            border-left: 4px solid #28a745;
+        }
+        .toast-notification.error {
+            border-left: 4px solid #dc3545;
+        }
     </style>
 </head>
 <body>
@@ -77,9 +130,9 @@
 <div class="page-header">
     <div class="container">
         <div class="breadcrumb">
-            <a href="/index.html">Home</a>
+            <a href="/">Home</a>
             <span>›</span>
-            <a href="/events.html">Events</a>
+            <a href="/events">Events</a>
             <span>›</span>
             <span>New Booking</span>
         </div>
@@ -218,7 +271,81 @@
 </footer>
 
 <div id="toast"></div>
-<script src="/js/api.js"></script>
+
+<!-- ========== FIXED API FUNCTIONS - EMBEDDED DIRECTLY ========== -->
+<script>
+    // API Configuration - Embedded to ensure it works
+    const API_BASE = 'http://localhost:8080/api';
+
+    async function apiFetch(url, options = {}) {
+        console.log(`📡 API Call: ${API_BASE + url}`);
+        try {
+            const res = await fetch(API_BASE + url, {
+                headers: { 'Content-Type': 'application/json', ...options.headers },
+                ...options
+            });
+            const data = await res.json();
+            if (!res.ok) {
+                const msg = data.message || data.error || 'An error occurred';
+                throw new Error(msg);
+            }
+            return data;
+        } catch (err) {
+            console.error('API Fetch Error:', err);
+            throw err;
+        }
+    }
+
+    function formatDate(dateStr) {
+        if (!dateStr) return '—';
+        try {
+            const d = new Date(dateStr + 'T00:00:00');
+            return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+        } catch (e) {
+            return dateStr;
+        }
+    }
+
+    function showToast(message, type = 'success') {
+        const toastEl = document.getElementById('toast');
+        if (toastEl) {
+            toastEl.textContent = message;
+            toastEl.className = `show ${type}`;
+            setTimeout(() => { toastEl.className = ''; }, 3500);
+            return;
+        }
+
+        const toast = document.createElement('div');
+        toast.className = `toast-notification ${type}`;
+        toast.innerHTML = `<div class="toast-content">${escapeHtml(message)}</div>`;
+        document.body.appendChild(toast);
+        setTimeout(() => toast.classList.add('show'), 10);
+        setTimeout(() => {
+            toast.classList.remove('show');
+            setTimeout(() => toast.remove(), 300);
+        }, 3000);
+    }
+
+    function escapeHtml(text) {
+        if (!text) return '';
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    function setMinDate(inputId) {
+        const el = document.getElementById(inputId);
+        if (el) {
+            el.min = new Date().toISOString().split('T')[0];
+        }
+    }
+
+    console.log('✅ API functions initialized for booking.html');
+</script>
+
+<!-- Try to load external api.js as fallback -->
+<script src="/js/api.js" onerror="console.warn('⚠️ External api.js not found, using embedded version')"></script>
+
 <script>
     // Store resources globally
     let allResources = [];
@@ -238,6 +365,8 @@
 
             const container = document.getElementById('resourcesContainer');
 
+            if (!container) return;
+
             let html = '';
 
             if (venues.length > 0) {
@@ -249,8 +378,8 @@
                                 <div class="checkbox-item resource-type-venue">
                                     <input type="checkbox" class="resource-checkbox venue-checkbox" value="${v.id}" id="res_${v.id}" onchange="handleVenueSelection(this)">
                                     <label for="res_${v.id}">
-                                        <strong>${v.name}</strong><br>
-                                        <small>${v.description || 'Available'}</small>
+                                        <strong>${escapeHtml(v.name)}</strong><br>
+                                        <small>${escapeHtml(v.description || 'Available')}</small>
                                     </label>
                                 </div>
                             `).join('')}
@@ -266,10 +395,10 @@
                         <div class="checkbox-grid">
                             ${equipment.map(e => `
                                 <div class="checkbox-item resource-type-equipment">
-                                    <input type="checkbox" class="resource-checkbox equipment-checkbox" value="${e.id}" id="res_${e.id}" data-name="${e.name}" data-maxqty="${e.quantity || 1}" onchange="handleEquipmentSelection(this)">
+                                    <input type="checkbox" class="resource-checkbox equipment-checkbox" value="${e.id}" id="res_${e.id}" data-name="${escapeHtml(e.name)}" data-maxqty="${e.quantity || 1}" onchange="handleEquipmentSelection(this)">
                                     <label for="res_${e.id}" id="label_${e.id}">
-                                        <strong>${e.name}</strong><br>
-                                        <small>${e.description || 'Available'} (Quantity: ${e.quantity || 1})</small>
+                                        <strong>${escapeHtml(e.name)}</strong><br>
+                                        <small>${escapeHtml(e.description || 'Available')} (Quantity: ${e.quantity || 1})</small>
                                     </label>
                                 </div>
                             `).join('')}
@@ -278,16 +407,23 @@
                 `;
             }
 
+            if (html === '') {
+                html = '<p style="color:var(--gray-500)">No resources available.</p>';
+            }
+
             container.innerHTML = html;
         } catch (error) {
             console.error('Error loading resources:', error);
-            document.getElementById('resourcesContainer').innerHTML = '<p style="color:var(--danger)">Error loading resources</p>';
+            const container = document.getElementById('resourcesContainer');
+            if (container) {
+                container.innerHTML = '<p style="color:var(--danger)">Error loading resources. Please refresh the page.</p>';
+            }
+            showToast('Failed to load resources: ' + error.message, 'error');
         }
     }
 
     // Handle venue selection (no quantity needed)
     function handleVenueSelection(checkbox) {
-        // Venues don't need quantity selection
         console.log('Venue selected:', checkbox.value);
     }
 
@@ -308,21 +444,30 @@
             delete equipmentQuantities[id];
             // Reset label
             const label = document.getElementById(`label_${id}`);
-            const originalText = checkbox.parentElement.querySelector('label').innerHTML.split('<small>')[0];
             const equipment = allResources.find(r => r.id == id);
-            if (equipment) {
-                label.innerHTML = `<strong>${equipment.name}</strong><br><small>${equipment.description || 'Available'} (Quantity: ${equipment.quantity || 1})</small>`;
+            if (equipment && label) {
+                label.innerHTML = `<strong>${escapeHtml(equipment.name)}</strong><br><small>${escapeHtml(equipment.description || 'Available')} (Quantity: ${equipment.quantity || 1})</small>`;
             }
         }
     }
 
     function openQuantityModal() {
-        document.getElementById('quantityResourceName').innerHTML = `<strong>${currentEquipmentName}</strong>`;
-        document.getElementById('availableQuantity').textContent = currentEquipmentMaxQty;
-        document.getElementById('selectedQuantity').value = 1;
-        document.getElementById('selectedQuantity').max = currentEquipmentMaxQty;
-        document.getElementById('quantityError').style.display = 'none';
-        document.getElementById('quantityModal').classList.add('open');
+        const resourceNameEl = document.getElementById('quantityResourceName');
+        const availableQtyEl = document.getElementById('availableQuantity');
+        const quantityInput = document.getElementById('selectedQuantity');
+
+        if (resourceNameEl) resourceNameEl.innerHTML = `<strong>${escapeHtml(currentEquipmentName)}</strong>`;
+        if (availableQtyEl) availableQtyEl.textContent = currentEquipmentMaxQty;
+        if (quantityInput) {
+            quantityInput.value = 1;
+            quantityInput.max = currentEquipmentMaxQty;
+        }
+
+        const errorDiv = document.getElementById('quantityError');
+        if (errorDiv) errorDiv.style.display = 'none';
+
+        const modal = document.getElementById('quantityModal');
+        if (modal) modal.classList.add('open');
     }
 
     function closeQuantityModal() {
@@ -331,23 +476,29 @@
         if (checkbox && checkbox.checked && !equipmentQuantities[currentEquipmentId]) {
             checkbox.checked = false;
         }
-        document.getElementById('quantityModal').classList.remove('open');
+        const modal = document.getElementById('quantityModal');
+        if (modal) modal.classList.remove('open');
     }
 
     function confirmQuantity() {
-        const quantity = parseInt(document.getElementById('selectedQuantity').value);
+        const quantityInput = document.getElementById('selectedQuantity');
+        const quantity = parseInt(quantityInput?.value || 0);
         const maxQuantity = currentEquipmentMaxQty;
         const errorDiv = document.getElementById('quantityError');
 
         if (quantity < 1) {
-            errorDiv.textContent = 'Quantity must be at least 1';
-            errorDiv.style.display = 'block';
+            if (errorDiv) {
+                errorDiv.textContent = 'Quantity must be at least 1';
+                errorDiv.style.display = 'block';
+            }
             return;
         }
 
         if (quantity > maxQuantity) {
-            errorDiv.textContent = `Only ${maxQuantity} units available!`;
-            errorDiv.style.display = 'block';
+            if (errorDiv) {
+                errorDiv.textContent = `Only ${maxQuantity} units available!`;
+                errorDiv.style.display = 'block';
+            }
             return;
         }
 
@@ -357,8 +508,8 @@
         // Update label to show selected quantity
         const label = document.getElementById(`label_${currentEquipmentId}`);
         const equipment = allResources.find(r => r.id == currentEquipmentId);
-        if (equipment) {
-            label.innerHTML = `<strong>${equipment.name}</strong><br><small>Quantity: ${quantity} (Max: ${maxQuantity})</small>`;
+        if (equipment && label) {
+            label.innerHTML = `<strong>${escapeHtml(equipment.name)}</strong><br><small>Quantity: ${quantity} (Max: ${maxQuantity})</small>`;
         }
 
         closeQuantityModal();
@@ -370,35 +521,86 @@
         return selectedIds;
     }
 
-    document.addEventListener('DOMContentLoaded', async () => {
+    function hideAlerts() {
+        const successAlert = document.getElementById('successAlert');
+        const errorAlert = document.getElementById('errorAlert');
+        if (successAlert) successAlert.classList.remove('show');
+        if (errorAlert) errorAlert.classList.remove('show');
+    }
+
+    function showError(msg) {
+        const errorMsgSpan = document.getElementById('errorMsg');
+        const errorAlert = document.getElementById('errorAlert');
+        if (errorMsgSpan) errorMsgSpan.textContent = msg;
+        if (errorAlert) {
+            errorAlert.classList.add('show');
+            errorAlert.scrollIntoView({ behavior: 'smooth' });
+        }
+    }
+
+    function showSuccess(msg) {
+        const successMsgSpan = document.getElementById('successMsg');
+        const successAlert = document.getElementById('successAlert');
+        if (successMsgSpan) successMsgSpan.textContent = msg;
+        if (successAlert) {
+            successAlert.classList.add('show');
+            successAlert.scrollIntoView({ behavior: 'smooth' });
+        }
+    }
+
+    function resetForm() {
+        const fields = ['title', 'description', 'organizerName', 'contactEmail', 'eventDate', 'startTime', 'endTime', 'notes'];
+        fields.forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.value = '';
+        });
+
+        const checkboxes = document.querySelectorAll('.resource-checkbox');
+        checkboxes.forEach(cb => cb.checked = false);
+
+        const imageInput = document.getElementById('eventImage');
+        if (imageInput) imageInput.value = '';
+
+        equipmentQuantities = {};
+
         setMinDate('eventDate');
-        await loadResourcesAsCheckboxes();
-    });
+    }
 
     async function submitBooking() {
-        const title    = document.getElementById('title').value.trim();
-        const desc     = document.getElementById('description').value.trim();
-        const orgName  = document.getElementById('organizerName').value.trim();
-        const email    = document.getElementById('contactEmail').value.trim();
-        const date     = document.getElementById('eventDate').value;
-        const start    = document.getElementById('startTime').value;
-        const end      = document.getElementById('endTime').value;
-        const notes    = document.getElementById('notes').value.trim();
-        const imageFile = document.getElementById('eventImage').files[0];
+        const titleEl = document.getElementById('title');
+        const descEl = document.getElementById('description');
+        const orgNameEl = document.getElementById('organizerName');
+        const emailEl = document.getElementById('contactEmail');
+        const dateEl = document.getElementById('eventDate');
+        const startEl = document.getElementById('startTime');
+        const endEl = document.getElementById('endTime');
+        const notesEl = document.getElementById('notes');
+        const imageFile = document.getElementById('eventImage')?.files[0];
+
+        const title = titleEl?.value.trim() || '';
+        const desc = descEl?.value.trim() || '';
+        const orgName = orgNameEl?.value.trim() || '';
+        const email = emailEl?.value.trim() || '';
+        const date = dateEl?.value || '';
+        const start = startEl?.value || '';
+        const end = endEl?.value || '';
+        const notes = notesEl?.value.trim() || '';
         const selectedResources = getSelectedResources();
 
         hideAlerts();
 
-        if (!title)   return showError('Event title is required.');
+        if (!title) return showError('Event title is required.');
         if (!orgName) return showError('Organizer name is required.');
-        if (!email)   return showError('Contact email is required.');
-        if (!date)    return showError('Event date is required.');
+        if (!email) return showError('Contact email is required.');
+        if (!date) return showError('Event date is required.');
         if (selectedResources.length === 0) return showError('Please select at least one resource.');
 
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         if (!emailRegex.test(email)) return showError('Please enter a valid email address.');
 
         const btn = document.getElementById('submitBtn');
+        if (!btn) return;
+
         btn.disabled = true;
         btn.innerHTML = '<span class="spinner"></span> Submitting...';
 
@@ -409,8 +611,8 @@
             formData.append('organizerName', orgName);
             formData.append('contactEmail', email);
             formData.append('eventDate', date);
-            formData.append('startTime', start || '');
-            formData.append('endTime', end || '');
+            formData.append('startTime', start);
+            formData.append('endTime', end);
             formData.append('notes', notes);
 
             selectedResources.forEach(resId => {
@@ -433,9 +635,7 @@
             const data = await response.json();
 
             if (data.success) {
-                document.getElementById('successMsg').textContent = data.message;
-                document.getElementById('successAlert').classList.add('show');
-                document.getElementById('successAlert').scrollIntoView({ behavior: 'smooth' });
+                showSuccess(data.message || 'Booking created successfully!');
                 showToast('Booking created successfully! 🎉', 'success');
                 resetForm();
             } else {
@@ -450,28 +650,12 @@
         }
     }
 
-    function showError(msg) {
-        document.getElementById('errorMsg').textContent = msg;
-        document.getElementById('errorAlert').classList.add('show');
-        document.getElementById('errorAlert').scrollIntoView({ behavior: 'smooth' });
-    }
-
-    function hideAlerts() {
-        document.getElementById('successAlert').classList.remove('show');
-        document.getElementById('errorAlert').classList.remove('show');
-    }
-
-    function resetForm() {
-        ['title','description','organizerName','contactEmail',
-            'eventDate','startTime','endTime','notes'].forEach(id => {
-            document.getElementById(id).value = '';
-        });
-        const checkboxes = document.querySelectorAll('.resource-checkbox');
-        checkboxes.forEach(cb => cb.checked = false);
-        document.getElementById('eventImage').value = '';
-        equipmentQuantities = {};
+    // Initialize page
+    document.addEventListener('DOMContentLoaded', async () => {
         setMinDate('eventDate');
-    }
+        await loadResourcesAsCheckboxes();
+        console.log('✅ Booking page initialized');
+    });
 </script>
 
 <!-- Import Navbar Script -->
