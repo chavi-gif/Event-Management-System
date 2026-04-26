@@ -217,6 +217,106 @@
             border: 1px solid var(--gray-300);
         }
 
+        .toast-notification {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: white;
+            padding: 12px 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            z-index: 10000;
+            transform: translateX(400px);
+            transition: transform 0.3s ease;
+        }
+
+        .toast-notification.show {
+            transform: translateX(0);
+        }
+
+        .toast-notification.success {
+            border-left: 4px solid #28a745;
+        }
+
+        .toast-notification.error {
+            border-left: 4px solid #dc3545;
+        }
+
+        .toast-confirm {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(0.9);
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            z-index: 10002;
+            padding: 1.5rem;
+            min-width: 300px;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.2s ease;
+        }
+
+        .toast-confirm.show {
+            transform: translate(-50%, -50%) scale(1);
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .toast-confirm-content {
+            text-align: center;
+        }
+
+        .toast-confirm-message {
+            display: block;
+            margin-bottom: 1.5rem;
+            font-size: 1rem;
+            color: var(--navy);
+        }
+
+        .toast-confirm-buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+
+        .toast-confirm-btn {
+            padding: 8px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9rem;
+        }
+
+        .toast-confirm-btn.confirm {
+            background: var(--danger);
+            color: white;
+        }
+
+        .toast-confirm-btn.cancel {
+            background: var(--gray-300);
+            color: var(--navy);
+        }
+
+        .modal-backdrop {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 10000;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.2s ease;
+        }
+
+        .modal-backdrop.show {
+            opacity: 1;
+            visibility: visible;
+        }
+
         @media (max-width: 768px) {
             .admin-sidebar { display: none; }
             .admin-content { margin-left: 0; }
@@ -377,7 +477,18 @@
     </div>
 </div>
 
+<!-- Toast Container -->
+<div id="toast"></div>
+
 <script>
+    // Helper function to escape HTML
+    function escapeHtml(text) {
+        if (!text) return '';
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
     // Toggle quantity field based on type selection
     function toggleQuantityField() {
         const type = document.getElementById('resourceType').value;
@@ -400,52 +511,78 @@
     }
 
     // Image preview for add form
-    document.getElementById('resourceImage').addEventListener('change', function(e) {
-        const preview = document.getElementById('imagePreview');
-        if (e.target.files && e.target.files[0]) {
-            const reader = new FileReader();
-            reader.onload = function(ev) {
-                preview.src = ev.target.result;
-                preview.style.display = 'block';
-            };
-            reader.readAsDataURL(e.target.files[0]);
-        }
-    });
+    const resourceImageInput = document.getElementById('resourceImage');
+    if (resourceImageInput) {
+        resourceImageInput.addEventListener('change', function(e) {
+            const preview = document.getElementById('imagePreview');
+            if (e.target.files && e.target.files[0]) {
+                const reader = new FileReader();
+                reader.onload = function(ev) {
+                    preview.src = ev.target.result;
+                    preview.style.display = 'block';
+                };
+                reader.readAsDataURL(e.target.files[0]);
+            }
+        });
+    }
+
+    // Image preview for edit form
+    const editImageInput = document.getElementById('editImage');
+    if (editImageInput) {
+        editImageInput.addEventListener('change', function(e) {
+            const preview = document.getElementById('editImagePreview');
+            if (e.target.files && e.target.files[0]) {
+                const reader = new FileReader();
+                reader.onload = function(ev) {
+                    preview.src = ev.target.result;
+                    preview.style.display = 'block';
+                };
+                reader.readAsDataURL(e.target.files[0]);
+            }
+        });
+    }
 
     // Add Resource with Image and Quantity
-    document.getElementById('addResourceForm').addEventListener('submit', function(e) {
-        e.preventDefault();
+    const addResourceForm = document.getElementById('addResourceForm');
+    if (addResourceForm) {
+        addResourceForm.addEventListener('submit', function(e) {
+            e.preventDefault();
 
-        const formData = new FormData();
-        formData.append('name', document.getElementById('resourceName').value);
-        formData.append('type', document.getElementById('resourceType').value);
-        formData.append('description', document.getElementById('resourceDesc').value);
+            const formData = new FormData();
+            formData.append('name', document.getElementById('resourceName').value);
+            formData.append('type', document.getElementById('resourceType').value);
+            formData.append('description', document.getElementById('resourceDesc').value);
 
-        // Add quantity if equipment
-        const type = document.getElementById('resourceType').value;
-        if (type === 'EQUIPMENT') {
-            formData.append('quantity', document.getElementById('resourceQuantity').value);
-        }
+            // Add quantity if equipment
+            const type = document.getElementById('resourceType').value;
+            if (type === 'EQUIPMENT') {
+                formData.append('quantity', document.getElementById('resourceQuantity').value);
+            }
 
-        const imageFile = document.getElementById('resourceImage').files[0];
-        if (imageFile) {
-            formData.append('image', imageFile);
-        }
+            const imageFile = document.getElementById('resourceImage').files[0];
+            if (imageFile) {
+                formData.append('image', imageFile);
+            }
 
-        fetch('/admin/resource/add', {
-            method: 'POST',
-            body: formData
-        })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    showToast('✅ Resource added successfully!', 'success');
-                    setTimeout(() => location.reload(), 1000);
-                } else {
-                    showToast('❌ Failed to add resource', 'error');
-                }
-            });
-    });
+            fetch('/admin/resource/add', {
+                method: 'POST',
+                body: formData
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        showToast('✅ Resource added successfully!', 'success');
+                        setTimeout(() => location.reload(), 1000);
+                    } else {
+                        showToast('❌ Failed to add resource: ' + (data.message || 'Unknown error'), 'error');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error adding resource:', error);
+                    showToast('❌ Error adding resource: ' + error.message, 'error');
+                });
+        });
+    }
 
     // Toggle Availability
     function toggleAvailability(btn) {
@@ -463,14 +600,23 @@
                     showToast(currentAvailable ? '❌ Resource marked as Unavailable' : '✅ Resource marked as Available', 'success');
                     setTimeout(() => location.reload(), 1000);
                 } else {
-                    //showToast('❌ Failed to update availability', 'error');
+                    showToast('❌ Failed to update availability', 'error');
                 }
+            })
+            .catch(error => {
+                console.error('Error toggling availability:', error);
+                showToast('❌ Error updating availability', 'error');
             });
     }
 
     // Delete Resource
     function deleteResource(id) {
-        showConfirmDialog('Delete this resource?', 'Delete', 'Cancel', () => {
+        if (!id) {
+            showToast('❌ Invalid resource ID', 'error');
+            return;
+        }
+
+        showConfirmDialog('Delete this resource? This action cannot be undone.', 'Delete', 'Cancel', () => {
             fetch(`/admin/resource/delete/${id}`, { method: 'DELETE' })
                 .then(response => response.json())
                 .then(data => {
@@ -478,21 +624,36 @@
                         showToast('🗑️ Resource deleted successfully!', 'success');
                         setTimeout(() => location.reload(), 1000);
                     } else {
-                        showToast('❌ Failed to delete resource', 'error');
+                        showToast('❌ Failed to delete resource: ' + (data.message || 'Unknown error'), 'error');
                     }
+                })
+                .catch(error => {
+                    console.error('Error deleting resource:', error);
+                    showToast('❌ Error deleting resource', 'error');
                 });
         });
     }
 
     // Open Edit Modal
     function openEditModal(btn) {
-        document.getElementById('editId').value = btn.getAttribute('data-id');
-        document.getElementById('editName').value = btn.getAttribute('data-name');
-        document.getElementById('editType').value = btn.getAttribute('data-type');
-        document.getElementById('editDesc').value = btn.getAttribute('data-desc') || '';
-        document.getElementById('editAvailable').value = btn.getAttribute('data-available');
-
+        const id = btn.getAttribute('data-id');
+        const name = btn.getAttribute('data-name');
+        const type = btn.getAttribute('data-type');
+        const desc = btn.getAttribute('data-desc') || '';
+        const available = btn.getAttribute('data-available');
         const quantity = btn.getAttribute('data-quantity');
+
+        if (!id) {
+            showToast('❌ Invalid resource data', 'error');
+            return;
+        }
+
+        document.getElementById('editId').value = id;
+        document.getElementById('editName').value = name || '';
+        document.getElementById('editType').value = type || 'VENUE';
+        document.getElementById('editDesc').value = desc;
+        document.getElementById('editAvailable').value = available || 'true';
+
         if (quantity && quantity !== 'null') {
             document.getElementById('editQuantity').value = quantity;
         } else {
@@ -500,7 +661,6 @@
         }
 
         // Show/hide quantity field based on type
-        const type = btn.getAttribute('data-type');
         const editQuantityGroup = document.getElementById('editQuantityGroup');
         if (type === 'EQUIPMENT') {
             editQuantityGroup.style.display = 'block';
@@ -516,6 +676,11 @@
     // Save Edit with Image and Quantity
     function saveEdit() {
         const id = document.getElementById('editId').value;
+        if (!id) {
+            showToast('❌ Invalid resource ID', 'error');
+            return;
+        }
+
         const formData = new FormData();
         formData.append('name', document.getElementById('editName').value);
         formData.append('type', document.getElementById('editType').value);
@@ -544,20 +709,37 @@
                     closeModal();
                     setTimeout(() => location.reload(), 1000);
                 } else {
-                    showToast('❌ Failed to update resource', 'error');
+                    showToast('❌ Failed to update resource: ' + (data.message || 'Unknown error'), 'error');
                 }
+            })
+            .catch(error => {
+                console.error('Error updating resource:', error);
+                showToast('❌ Error updating resource', 'error');
             });
     }
 
     function closeModal() {
-        document.getElementById('editModal').classList.remove('show');
+        const modal = document.getElementById('editModal');
+        if (modal) {
+            modal.classList.remove('show');
+        }
     }
 
     // Toast Notification
     function showToast(message, type) {
+        // Try to use the global toast element first
+        const toastEl = document.getElementById('toast');
+        if (toastEl) {
+            toastEl.textContent = message;
+            toastEl.className = `show ${type}`;
+            setTimeout(() => { toastEl.className = ''; }, 3500);
+            return;
+        }
+
+        // Fallback toast
         const toast = document.createElement('div');
         toast.className = `toast-notification ${type}`;
-        toast.innerHTML = `<div class="toast-content">${message}</div>`;
+        toast.innerHTML = `<div class="toast-content">${escapeHtml(message)}</div>`;
         document.body.appendChild(toast);
         setTimeout(() => toast.classList.add('show'), 10);
         setTimeout(() => {
@@ -577,10 +759,10 @@
         modal.className = 'toast-confirm';
         modal.innerHTML = `
             <div class="toast-confirm-content">
-                <span class="toast-confirm-message">${message}</span>
+                <span class="toast-confirm-message">${escapeHtml(message)}</span>
                 <div class="toast-confirm-buttons">
-                    <button class="toast-confirm-btn cancel">${cancelText}</button>
-                    <button class="toast-confirm-btn confirm">${confirmText}</button>
+                    <button class="toast-confirm-btn cancel">${escapeHtml(cancelText)}</button>
+                    <button class="toast-confirm-btn confirm">${escapeHtml(confirmText)}</button>
                 </div>
             </div>
         `;
@@ -599,16 +781,19 @@
         modal.querySelector('.cancel').onclick = close;
         modal.querySelector('.confirm').onclick = () => {
             close();
-            onConfirm();
+            if (onConfirm) onConfirm();
         };
     }
 
+    // Close modal when clicking outside
     window.onclick = function(e) {
         const modal = document.getElementById('editModal');
         if (e.target === modal) {
             closeModal();
         }
     }
+
+    console.log('✅ Resources page initialized');
 </script>
 
 </body>
