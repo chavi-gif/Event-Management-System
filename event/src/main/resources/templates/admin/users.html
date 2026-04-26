@@ -50,7 +50,7 @@
 
         .stats-summary {
             display: grid;
-            grid-template-columns: repeat(3, 1fr);
+            grid-template-columns: repeat(5, 1fr);
             gap: 1rem;
             margin-bottom: 2rem;
         }
@@ -136,7 +136,7 @@
         @media (max-width: 768px) {
             .admin-sidebar { display: none; }
             .admin-content { margin-left: 0; }
-            .stats-summary { grid-template-columns: 1fr; }
+            .stats-summary { grid-template-columns: repeat(2, 1fr); }
             .user-table { font-size: 0.8rem; }
         }
     </style>
@@ -183,7 +183,7 @@
         <h1 class="section-title">Manage Users</h1>
         <div class="divider"></div>
 
-        <!-- Statistics Summary -->
+        <!-- Statistics Summary - Now includes Level 1, 2, 3, 4 and Total -->
         <div class="stats-summary">
             <div class="stat-mini">
                 <div class="stat-mini-number" th:text="${users.size()}">0</div>
@@ -192,6 +192,14 @@
             <div class="stat-mini">
                 <div class="stat-mini-number" th:text="${#lists.size(users.?[level == '1'])}">0</div>
                 <div class="stat-mini-label">Level 1 Students</div>
+            </div>
+            <div class="stat-mini">
+                <div class="stat-mini-number" th:text="${#lists.size(users.?[level == '2'])}">0</div>
+                <div class="stat-mini-label">Level 2 Students</div>
+            </div>
+            <div class="stat-mini">
+                <div class="stat-mini-number" th:text="${#lists.size(users.?[level == '3'])}">0</div>
+                <div class="stat-mini-label">Level 3 Students</div>
             </div>
             <div class="stat-mini">
                 <div class="stat-mini-number" th:text="${#lists.size(users.?[level == '4'])}">0</div>
