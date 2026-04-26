@@ -3,6 +3,7 @@
 <head th:fragment="navbar-head">
     <link rel="stylesheet" href="/css/style.css"/>
 </head>
+
 <div th:fragment="navbar">
     <nav class="navbar">
         <a href="/" class="nav-brand">
@@ -14,8 +15,8 @@
         </a>
         <ul class="nav-links">
             <li><a href="/">Home</a></li>
-            <li><a href="/events">Events</a></li>
-            <li><a href="/booking">Book Event</a></li>
+            <li><a href="#" class="protected-link" data-href="/events">Events</a></li>
+            <li><a href="#" class="protected-link" data-href="/booking">Book Event</a></li>
             <li><a href="/resources">Resources</a></li>
             <li id="navAuthItem">
                 <a href="/login" class="btn-nav-login">Login</a>
@@ -25,30 +26,92 @@
 </div>
 
 <script th:fragment="navbar-script">
+    // Global variable for current user
     let currentUser = null;
+    let authInitialized = false;
 
+    // Helper function to escape HTML
+    function escapeHtml(text) {
+        if (!text) return '';
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    // Get first name from user object
+    function getFirstName(user) {
+        if (user.firstName) return user.firstName;
+        if (user.email) {
+            const namePart = user.email.split('@')[0];
+            // Convert email prefix to proper name format
+            return namePart.replace(/[._]/g, ' ').split(' ').map(word =>
+                word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+            ).join(' ');
+        }
+        return 'User';
+    }
+
+    // Load current user from session
     function loadCurrentUser() {
-        fetch('/api/current-user')
-            .then(response => response.ok ? response.json() : null)
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+
+        fetch('/api/current-user', { signal: controller.signal })
+            .then(response => {
+                clearTimeout(timeoutId);
+                if (response.ok) {
+                    return response.json();
+                }
+                return null;
+            })
             .then(user => {
                 currentUser = user;
                 updateNavbar();
+                console.log(currentUser ? `✅ User logged in: ${currentUser.email}` : 'ℹ️ No user logged in');
             })
-            .catch(() => updateNavbar());
+            .catch(error => {
+                clearTimeout(timeoutId);
+                if (error.name === 'AbortError') {
+                    console.warn('⚠️ Request timeout for current-user API');
+                } else {
+                    console.warn('⚠️ Failed to load current user:', error.message);
+                }
+                currentUser = null;
+                updateNavbar();
+            });
     }
 
+    // Check if user is logged in
+    function isLoggedIn() {
+        return currentUser !== null;
+    }
+
+    // Update navbar based on login state
     function updateNavbar() {
         const authItem = document.getElementById('navAuthItem');
-        if (!authItem) return;
+        if (!authItem) {
+            console.warn('Navigation auth item not found');
+            return;
+        }
 
         if (currentUser) {
-            const firstName = currentUser.firstName || currentUser.email.split('@')[0];
+            const firstName = getFirstName(currentUser);
             const initial = firstName.charAt(0).toUpperCase();
+
+            // Check if user is admin
+            const isAdmin = currentUser.email === 'admin@gmail.com';
+
             authItem.innerHTML = `
                 <div style="display:flex;align-items:center;gap:10px;">
-                    <div style="width:34px;height:34px;border-radius:50%;background:var(--gold);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;">${initial}</div>
-                    <span style="color:#fff;">Hi, ${firstName}</span>
-                    <button onclick="window.location.href='/logout'" style="background:#c9922a;border:1px solid #c9922a;color:#fff;padding:5px 12px;border-radius:6px;cursor:pointer;">Logout</button>
+                    <div style="width:34px;height:34px;border-radius:50%;background:var(--gold);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;cursor:default;">
+                        ${escapeHtml(initial)}
+                    </div>
+                    <span style="color:#fff; font-size:0.9rem;">${escapeHtml(firstName)}</span>
+                    ${isAdmin ? '<span style="background:var(--gold);color:var(--navy);padding:2px 8px;border-radius:12px;font-size:0.7rem;font-weight:700;">Admin</span>' : ''}
+                    <button onclick="performLogout()" style="background:#c9922a;border:1px solid #c9922a;color:#fff;padding:5px 12px;border-radius:6px;cursor:pointer;transition:all 0.2s;"
+                            onmouseover="this.style.background='#b87d1a'" onmouseout="this.style.background='#c9922a'">
+                        Logout
+                    </button>
                 </div>
             `;
         } else {
@@ -56,6 +119,130 @@
         }
     }
 
-    loadCurrentUser();
+    // Perform logout
+    function performLogout() {
+        // Show loading state on button
+        const logoutBtn = document.querySelector('#navAuthItem button');
+        if (logoutBtn) {
+            const originalText = logoutBtn.textContent;
+            logoutBtn.textContent = 'Logging out...';
+            logoutBtn.disabled = true;
+        }
+
+        fetch('/logout', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        })
+            .then(response => {
+                if (response.ok) {
+                    currentUser = null;
+                    updateNavbar();
+                    // Redirect to home page after logout
+                    window.location.href = '/';
+                } else {
+                    console.error('Logout failed');
+                    if (logoutBtn) {
+                        logoutBtn.textContent = originalText;
+                        logoutBtn.disabled = false;
+                    }
+                }
+            })
+            .catch(error => {
+                console.error('Logout error:', error);
+                if (logoutBtn) {
+                    logoutBtn.textContent = originalText;
+                    logoutBtn.disabled = false;
+                }
+            });
+    }
+
+    // Open login modal (for pages that have it)
+    function openLoginModal() {
+        const modal = document.getElementById('loginModal');
+        if (modal) {
+            modal.classList.add('open');
+        } else {
+            // If no modal on current page, redirect to login page
+            window.location.href = '/login';
+        }
+    }
+
+    // Setup protected links (events that require authentication)
+    function setupProtectedLinks() {
+        const protectedLinks = document.querySelectorAll('.protected-link');
+        protectedLinks.forEach(link => {
+            // Remove existing event listeners to prevent duplicates
+            const newLink = link.cloneNode(true);
+            link.parentNode.replaceChild(newLink, link);
+
+            newLink.addEventListener('click', function(e) {
+                e.preventDefault();
+                const targetUrl = this.getAttribute('data-href');
+                if (!targetUrl) return;
+
+                if (isLoggedIn()) {
+                    window.location.href = targetUrl;
+                } else {
+                    // Try to open login modal from index page
+                    const modal = document.getElementById('loginModal');
+                    if (modal) {
+                        modal.classList.add('open');
+                    } else {
+                        // Redirect to login with return URL
+                        window.location.href = `/login?redirect=${encodeURIComponent(targetUrl)}`;
+                    }
+                }
+            });
+        });
+
+        if (protectedLinks.length > 0) {
+            console.log(`✅ Setup ${protectedLinks.length} protected link(s)`);
+        }
+    }
+
+    // Update navbar when user logs in/out (listen for storage events)
+    window.addEventListener('storage', function(e) {
+        if (e.key === 'userLoggedOut' || e.key === 'userLoggedIn') {
+            loadCurrentUser();
+        }
+    });
+
+    // Initialize navbar when DOM is ready
+    function initNavbar() {
+        if (authInitialized) return;
+        authInitialized = true;
+
+        loadCurrentUser();
+
+        // Small delay to ensure DOM is fully ready
+        setTimeout(() => {
+            setupProtectedLinks();
+        }, 150);
+    }
+
+    // Run initialization when DOM is ready
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initNavbar);
+    } else {
+        initNavbar();
+    }
+
+    // Re-run setup when page content might have been dynamically loaded
+    if (window.MutationObserver) {
+        const observer = new MutationObserver(function(mutations) {
+            mutations.forEach(function(mutation) {
+                if (mutation.addedNodes.length) {
+                    setupProtectedLinks();
+                }
+            });
+        });
+
+        document.addEventListener('DOMContentLoaded', function() {
+            observer.observe(document.body, { childList: true, subtree: true });
+        });
+    }
+
+    console.log('✅ Navbar script initialized');
 </script>
+
 </html>
