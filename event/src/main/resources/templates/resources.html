@@ -61,6 +61,48 @@
             font-weight: 600;
             margin-left: 8px;
         }
+        .toast-notification {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: white;
+            padding: 12px 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            z-index: 10000;
+            transform: translateX(400px);
+            transition: transform 0.3s ease;
+        }
+        .toast-notification.show {
+            transform: translateX(0);
+        }
+        .toast-notification.success {
+            border-left: 4px solid #28a745;
+        }
+        .toast-notification.error {
+            border-left: 4px solid #dc3545;
+        }
+        .edit-delete-buttons {
+            margin-top: 10px;
+            display: flex;
+            gap: 8px;
+            justify-content: flex-end;
+        }
+        .btn-warning {
+            background: var(--warning);
+            color: white;
+        }
+        .btn-warning:hover {
+            background: #e0a800;
+        }
+        .admin-badge {
+            background: var(--gold);
+            color: white;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 0.7rem;
+            margin-left: 8px;
+        }
     </style>
 </head>
 <body>
@@ -85,8 +127,8 @@
 <main>
     <div class="container">
 
-        <div class="alert alert-success" id="successAlert"></div>
-        <div class="alert alert-danger" id="errorAlert"></div>
+        <div class="alert alert-success" id="successAlert" style="display:none;"></div>
+        <div class="alert alert-danger" id="errorAlert" style="display:none;"></div>
 
         <!-- Two column: Venues | Equipment -->
         <div class="grid-2">
@@ -141,6 +183,11 @@
                     <label class="form-label" for="newDesc">Description</label>
                     <input type="text" class="form-control" id="newDesc" placeholder="Brief description..."/>
                 </div>
+                <div class="form-group">
+                    <label class="form-label" for="newQuantity">Quantity (for Equipment)</label>
+                    <input type="number" class="form-control" id="newQuantity" placeholder="1" value="1" min="1"/>
+                    <small style="color:var(--gray-500);">Only applicable for equipment. Venues always have quantity 1.</small>
+                </div>
                 <button class="btn btn-gold" onclick="addResource()" id="addBtn">
                     ➕ Add Resource
                 </button>
@@ -183,7 +230,11 @@
                 <label class="form-label">Description</label>
                 <input type="text" class="form-control" id="editResDesc"/>
             </div>
-            <div class="alert alert-danger" id="editResError"></div>
+            <div class="form-group" id="editQuantityGroup" style="display:none;">
+                <label class="form-label">Quantity</label>
+                <input type="number" class="form-control" id="editResQuantity" min="1"/>
+            </div>
+            <div class="alert alert-danger" id="editResError" style="display:none;"></div>
         </div>
         <div class="modal-footer">
             <button class="btn btn-outline" onclick="closeModal('editResModal')">Cancel</button>
@@ -198,49 +249,124 @@
 </footer>
 
 <div id="toast"></div>
-<script src="/js/api.js"></script>
+
+<!-- ========== FIXED API FUNCTIONS - EMBEDDED DIRECTLY ========== -->
 <script>
+    // API Configuration - Embedded to ensure it works
+    const API_BASE = 'http://localhost:8080/api';
     const DEFAULT_VENUE = '/images/event-default.jpg';
-
     let allResources = [];
+    let currentUser = null;
 
+    async function apiFetch(url, options = {}) {
+        console.log(`📡 API Call: ${API_BASE + url}`);
+        try {
+            const res = await fetch(API_BASE + url, {
+                headers: { 'Content-Type': 'application/json', ...options.headers },
+                ...options
+            });
+            const data = await res.json();
+            if (!res.ok) {
+                const msg = data.message || data.error || 'An error occurred';
+                throw new Error(msg);
+            }
+            return data;
+        } catch (err) {
+            console.error('API Fetch Error:', err);
+            throw err;
+        }
+    }
+
+    function formatDate(dateStr) {
+        if (!dateStr) return '—';
+        const d = new Date(dateStr + 'T00:00:00');
+        return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+    }
+
+    function showToast(message, type = 'success') {
+        const toastEl = document.getElementById('toast');
+        if (toastEl) {
+            toastEl.textContent = message;
+            toastEl.className = `show ${type}`;
+            setTimeout(() => { toastEl.className = ''; }, 3500);
+            return;
+        }
+
+        const toast = document.createElement('div');
+        toast.className = `toast-notification ${type}`;
+        toast.innerHTML = `<div class="toast-content">${escapeHtml(message)}</div>`;
+        document.body.appendChild(toast);
+        setTimeout(() => toast.classList.add('show'), 10);
+        setTimeout(() => {
+            toast.classList.remove('show');
+            setTimeout(() => toast.remove(), 300);
+        }, 3000);
+    }
+
+    function escapeHtml(text) {
+        if (!text) return '';
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    console.log('✅ API functions initialized for resources.html');
+</script>
+
+<!-- Try to load external api.js as fallback -->
+<script src="/js/api.js" onerror="console.warn('⚠️ External api.js not found, using embedded version')"></script>
+
+<script>
     // ========== GET CURRENT USER FROM SESSION ==========
     async function loadCurrentUser() {
         try {
             const response = await fetch('/api/current-user');
             if (response.ok) {
-                const currentUser = await response.json();
+                currentUser = await response.json();
                 const isAdmin = currentUser && currentUser.email === 'admin@gmail.com';
                 const addSection = document.getElementById('addResourceSection');
                 if (addSection) {
                     addSection.style.display = isAdmin ? 'block' : 'none';
                 }
+                if (isAdmin) {
+                    console.log('👑 Admin mode enabled - edit/delete buttons visible');
+                }
             }
         } catch (err) {
-            console.log('Not logged in');
+            console.log('Not logged in or user fetch failed');
         }
     }
 
     // ========== CHECK AVAILABILITY FOR A RESOURCE ON A DATE ==========
     async function checkAvailability(resourceId, date, resultElementId) {
         if (!date) {
-            document.getElementById(resultElementId).innerHTML = '<span class="avail-checking">⚠️ Please select a date</span>';
+            const resultEl = document.getElementById(resultElementId);
+            if (resultEl) {
+                resultEl.innerHTML = '<span class="avail-checking">⚠️ Please select a date</span>';
+            }
             return;
         }
 
-        document.getElementById(resultElementId).innerHTML = '<span class="avail-checking">🔍 Checking availability...</span>';
+        const resultEl = document.getElementById(resultElementId);
+        if (resultEl) {
+            resultEl.innerHTML = '<span class="avail-checking">🔍 Checking availability...</span>';
+        }
 
         try {
             const response = await fetch(`/api/events/check-availability?resourceId=${resourceId}&date=${date}`);
             const data = await response.json();
 
-            if (data.available) {
-                document.getElementById(resultElementId).innerHTML = '<span class="avail-available">✅ Available on ' + formatDateForDisplay(date) + '</span>';
-            } else {
-                document.getElementById(resultElementId).innerHTML = '<span class="avail-booked">❌ Booked on ' + formatDateForDisplay(date) + '</span>';
+            if (resultEl) {
+                if (data.available) {
+                    resultEl.innerHTML = '<span class="avail-available">✅ Available on ' + formatDateForDisplay(date) + '</span>';
+                } else {
+                    resultEl.innerHTML = '<span class="avail-booked">❌ Booked on ' + formatDateForDisplay(date) + '</span>';
+                }
             }
         } catch (err) {
-            document.getElementById(resultElementId).innerHTML = '<span class="avail-booked">⚠️ Error checking availability</span>';
+            if (resultEl) {
+                resultEl.innerHTML = '<span class="avail-booked">⚠️ Error checking availability</span>';
+            }
         }
     }
 
@@ -262,6 +388,7 @@
     function renderResourceCards(resources) {
         const venues = resources.filter(r => r.type === 'VENUE');
         const equipment = resources.filter(r => r.type === 'EQUIPMENT');
+        const isAdmin = currentUser && currentUser.email === 'admin@gmail.com';
 
         const venueContainer = document.getElementById('venueCards');
         const equipmentContainer = document.getElementById('equipmentCards');
@@ -272,10 +399,10 @@
         } else {
             venueContainer.innerHTML = venues.map(venue => `
                 <div class="card" style="margin-bottom:1rem;">
-                    <img class="card-img" src="${venue.imageUrl || DEFAULT_VENUE}" alt="${venue.name}" onerror="this.src='${DEFAULT_VENUE}'">
+                    <img class="card-img" src="${venue.imageUrl || DEFAULT_VENUE}" alt="${escapeHtml(venue.name)}" onerror="this.src='${DEFAULT_VENUE}'">
                     <div class="card-body">
-                        <div class="card-title">${venue.name}</div>
-                        <p style="font-size:0.85rem;color:var(--gray-500);margin-bottom:0.8rem;">${venue.description || 'No description'}</p>
+                        <div class="card-title">${escapeHtml(venue.name)}</div>
+                        <p style="font-size:0.85rem;color:var(--gray-500);margin-bottom:0.8rem;">${escapeHtml(venue.description || 'No description')}</p>
                         <div style="margin-bottom:8px;">
                             ${venue.available ? '<span class="badge badge-approved">✅ Available for booking</span>' : '<span class="badge badge-cancelled">❌ Temporarily Unavailable</span>'}
                         </div>
@@ -284,6 +411,12 @@
                             <button class="btn btn-primary btn-sm" onclick="checkAvailability(${venue.id}, document.getElementById('date_${venue.id}').value, 'avail_result_${venue.id}')">Check</button>
                         </div>
                         <div id="avail_result_${venue.id}" class="avail-result"></div>
+                        ${isAdmin ? `
+                            <div class="edit-delete-buttons">
+                                <button class="btn btn-warning btn-sm" onclick="openEditResourceModal(${venue.id})">✏️ Edit</button>
+                                <button class="btn btn-danger btn-sm" onclick="deleteResource(${venue.id})">🗑️ Delete</button>
+                            </div>
+                        ` : ''}
                     </div>
                 </div>
             `).join('');
@@ -299,10 +432,10 @@
         } else {
             equipmentContainer.innerHTML = equipment.map(eq => `
                 <div class="card" style="margin-bottom:1rem;">
-                    <img class="card-img" src="${eq.imageUrl || DEFAULT_VENUE}" alt="${eq.name}" onerror="this.src='${DEFAULT_VENUE}'">
+                    <img class="card-img" src="${eq.imageUrl || DEFAULT_VENUE}" alt="${escapeHtml(eq.name)}" onerror="this.src='${DEFAULT_VENUE}'">
                     <div class="card-body">
-                        <div class="card-title">${eq.name}</div>
-                        <p style="font-size:0.85rem;color:var(--gray-500);margin-bottom:0.8rem;">${eq.description || 'No description'}</p>
+                        <div class="card-title">${escapeHtml(eq.name)}</div>
+                        <p style="font-size:0.85rem;color:var(--gray-500);margin-bottom:0.8rem;">${escapeHtml(eq.description || 'No description')}</p>
                         <div style="margin-bottom:8px; display: flex; align-items: center; justify-content: space-between;">
                             ${eq.available ? '<span class="badge badge-approved">✅ Available for booking</span>' : '<span class="badge badge-cancelled">❌ Temporarily Unavailable</span>'}
                             <span class="quantity-badge">📦 Quantity: ${eq.quantity || 1}</span>
@@ -312,6 +445,12 @@
                             <button class="btn btn-primary btn-sm" onclick="checkAvailability(${eq.id}, document.getElementById('date_${eq.id}').value, 'avail_result_${eq.id}')">Check</button>
                         </div>
                         <div id="avail_result_${eq.id}" class="avail-result"></div>
+                        ${isAdmin ? `
+                            <div class="edit-delete-buttons">
+                                <button class="btn btn-warning btn-sm" onclick="openEditResourceModal(${eq.id})">✏️ Edit</button>
+                                <button class="btn btn-danger btn-sm" onclick="deleteResource(${eq.id})">🗑️ Delete</button>
+                            </div>
+                        ` : ''}
                     </div>
                 </div>
             `).join('');
@@ -327,9 +466,12 @@
             allResources = await apiFetch('/resources');
             renderResourceCards(allResources);
         } catch (err) {
-            const msg = `<p style="color:var(--danger);">⚠ Cannot connect. Ensure backend is running.<br><small>${err.message}</small></p>`;
-            document.getElementById('venueCards').innerHTML = msg;
-            document.getElementById('equipmentCards').innerHTML = msg;
+            const msg = `<p style="color:var(--danger);">⚠ Cannot connect. Ensure backend is running.<br><small>${escapeHtml(err.message)}</small></p>`;
+            const venueContainer = document.getElementById('venueCards');
+            const equipmentContainer = document.getElementById('equipmentCards');
+            if (venueContainer) venueContainer.innerHTML = msg;
+            if (equipmentContainer) equipmentContainer.innerHTML = msg;
+            showToast('Failed to load resources: ' + err.message, 'error');
         }
     }
 
@@ -337,34 +479,48 @@
         const name = document.getElementById('newName').value.trim();
         const type = document.getElementById('newType').value;
         const description = document.getElementById('newDesc').value.trim();
+        const quantity = document.getElementById('newQuantity').value;
 
         if (!name) {
-            showError('Please enter resource name');
+            showToast('Please enter resource name', 'error');
             return;
+        }
+
+        const resourceData = {
+            name,
+            type,
+            description,
+            available: true
+        };
+
+        if (type === 'EQUIPMENT') {
+            resourceData.quantity = parseInt(quantity) || 1;
         }
 
         try {
             await apiFetch('/resources', {
                 method: 'POST',
-                body: JSON.stringify({ name, type, description, available: true })
+                body: JSON.stringify(resourceData)
             });
-            showSuccess('Resource added successfully!');
+            showToast('Resource added successfully!', 'success');
             document.getElementById('newName').value = '';
             document.getElementById('newDesc').value = '';
+            document.getElementById('newQuantity').value = '1';
             loadResources();
         } catch (err) {
-            showError('Failed to add resource: ' + err.message);
+            showToast('Failed to add resource: ' + err.message, 'error');
         }
     }
 
     async function deleteResource(id) {
-        if (!confirm('Are you sure you want to delete this resource?')) return;
+        if (!confirm('Are you sure you want to delete this resource? This action cannot be undone.')) return;
+
         try {
             await apiFetch(`/resources/${id}`, { method: 'DELETE' });
-            showSuccess('Resource deleted successfully!');
+            showToast('Resource deleted successfully!', 'success');
             loadResources();
         } catch (err) {
-            showError('Failed to delete resource: ' + err.message);
+            showToast('Failed to delete resource: ' + err.message, 'error');
         }
     }
 
@@ -377,6 +533,18 @@
         document.getElementById('editResType').value = resource.type;
         document.getElementById('editResAvail').value = resource.available;
         document.getElementById('editResDesc').value = resource.description || '';
+
+        // Handle quantity field for equipment
+        const quantityGroup = document.getElementById('editQuantityGroup');
+        const quantityInput = document.getElementById('editResQuantity');
+
+        if (resource.type === 'EQUIPMENT') {
+            quantityGroup.style.display = 'block';
+            quantityInput.value = resource.quantity || 1;
+        } else {
+            quantityGroup.style.display = 'none';
+        }
+
         document.getElementById('editResError').style.display = 'none';
         document.getElementById('editResModal').classList.add('open');
     }
@@ -388,48 +556,67 @@
         const available = document.getElementById('editResAvail').value === 'true';
         const description = document.getElementById('editResDesc').value.trim();
 
+        const resourceData = { name, type, description, available };
+
+        if (type === 'EQUIPMENT') {
+            const quantity = document.getElementById('editResQuantity').value;
+            resourceData.quantity = parseInt(quantity) || 1;
+        }
+
         if (!name) {
-            document.getElementById('editResError').textContent = 'Name is required';
-            document.getElementById('editResError').style.display = 'block';
+            const errorDiv = document.getElementById('editResError');
+            errorDiv.textContent = 'Name is required';
+            errorDiv.style.display = 'block';
             return;
         }
 
         try {
             await apiFetch(`/resources/${id}`, {
                 method: 'PUT',
-                body: JSON.stringify({ name, type, description, available })
+                body: JSON.stringify(resourceData)
             });
             closeModal('editResModal');
-            showSuccess('Resource updated successfully!');
+            showToast('Resource updated successfully!', 'success');
             loadResources();
         } catch (err) {
-            document.getElementById('editResError').textContent = err.message;
-            document.getElementById('editResError').style.display = 'block';
+            const errorDiv = document.getElementById('editResError');
+            errorDiv.textContent = err.message;
+            errorDiv.style.display = 'block';
         }
     }
 
     function closeModal(modalId) {
-        document.getElementById(modalId).classList.remove('open');
+        const modal = document.getElementById(modalId);
+        if (modal) {
+            modal.classList.remove('open');
+        }
     }
 
-    function showSuccess(message) {
-        const alert = document.getElementById('successAlert');
-        alert.textContent = message;
-        alert.style.display = 'block';
-        setTimeout(() => alert.style.display = 'none', 3000);
-    }
+    // Show/hide quantity field based on type selection in add form
+    const typeSelect = document.getElementById('newType');
+    const quantityGroup = document.getElementById('newQuantity')?.parentElement;
 
-    function showError(message) {
-        const alert = document.getElementById('errorAlert');
-        alert.textContent = message;
-        alert.style.display = 'block';
-        setTimeout(() => alert.style.display = 'none', 3000);
+    if (typeSelect && quantityGroup) {
+        typeSelect.addEventListener('change', function() {
+            if (this.value === 'EQUIPMENT') {
+                quantityGroup.style.display = 'block';
+            } else {
+                quantityGroup.style.display = 'none';
+            }
+        });
     }
 
     // Initialize page
     async function init() {
         await loadCurrentUser();
         await loadResources();
+    }
+
+    // Close modal when clicking outside
+    window.onclick = function(e) {
+        if (e.target.classList.contains('modal-overlay')) {
+            e.target.classList.remove('open');
+        }
     }
 
     init();
